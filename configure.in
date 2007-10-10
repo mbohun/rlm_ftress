@@ -1,0 +1,31 @@
+AC_INIT(rlm_ftress.c)
+AC_REVISION($Revision: 0.0 $)
+AC_DEFUN(modname,[rlm_ftress])
+
+if test x$with_[]modname != xno; then
+
+	AC_PROG_CC
+	AC_PROG_CPP
+
+	targetname=modname     # keep this!  Don't change!
+else
+	targetname=            # keep this!  Don't change!
+	echo \*\*\* module modname is disabled.  # keep this!  Don't change!
+fi
+
+dnl  Don't change this section.
+if test x"$fail" != x""; then
+	if test x"${enable_strict_dependencies}" = x"yes"; then
+		AC_MSG_ERROR([set --without-]modname[ to disable it explicitly.])
+	else
+		AC_MSG_WARN([silently not building ]modname[.])
+		AC_MSG_WARN([FAILURE: ]modname[ requires: $fail.]); 
+		targetname=""
+	fi
+fi
+
+AC_SUBST(ftress_cflags)
+AC_SUBST(ftress_ldflags)
+
+AC_SUBST(targetname)
+AC_OUTPUT(Makefile)
