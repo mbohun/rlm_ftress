@@ -1,0 +1,7 @@
+*~
+semantics.cache
+*.o
+*.a
+*.so
+*.la
+Makefile
