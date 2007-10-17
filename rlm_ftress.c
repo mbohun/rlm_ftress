@@ -46,13 +46,10 @@ typedef struct rlm_ftress_t {
 	char* default_channel;
 	char* security_domain;
 	char* authentication_type;
-
 	int proxy_mode;
 	int use_device_sn;
-
 	char* username;
 	char* password;
-
 } rlm_ftress_t;
 
 /*
@@ -65,17 +62,14 @@ typedef struct rlm_ftress_t {
  *	buffer over-flows.
  */
 static CONF_PARSER module_config[] = {
-	{ "default_channel",PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, string), NULL,  NULL},
-	{ "security_domain",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, string), NULL,  NULL},
-	{ "authentication_type",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, string), NULL,  NULL},
-
-	{ "proxy_mode", PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t,boolean), NULL, "no"},
-	{ "use_device_sn", PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t,boolean), NULL, "no"},
-
-	{ "username",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, string), NULL,  NULL},
-	{ "password",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, string), NULL,  NULL},
-
-	{ NULL, -1, 0, NULL, NULL }		/* end the list */
+	{ "default_channel",     PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, default_channel),     NULL,  NULL},
+	{ "security_domain",     PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, security_domain),     NULL,  NULL},
+	{ "authentication_type", PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, authentication_type), NULL,  NULL},
+	{ "proxy_mode",          PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, proxy_mode),          NULL, "no"},
+	{ "use_device_sn",       PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, use_device_sn),       NULL, "no"},
+	{ "username",            PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, username),            NULL,  NULL},
+	{ "password",            PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, password),            NULL,  NULL},
+	{ NULL, -1, 0, NULL, NULL }
 };
 
 /*
@@ -93,6 +87,13 @@ static int ftress_initiate(void) /* to avoid conflict with ftress API */
 	 */
 	return 0;
 }
+
+/* TODO: We can hide these later in a function that is re-initiating this module's
+ *       session.
+ */
+static ChannelCode channel_code;
+static SecurityDomain security_domain;
+static AuthenticationTypeCode authentication_type_code;
 
 /*
  *	Do any per-module initialization that is separate to each
@@ -130,10 +131,16 @@ static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 
 	ftress_init(); /* initialize the ftress client library */
 
+	
+
 	return 0;
 }
 
-static int example_authenticate(void *instance, REQUEST *request)
+static int authenticate_to_ftress() {
+
+}
+
+static int ftress_authenticate(void *instance, REQUEST *request)
 {
 	/* extract username and password */
 	char* username;
@@ -172,7 +179,6 @@ static int example_authenticate(void *instance, REQUEST *request)
 	}
 
 	/* do we have to check password length? */
-
 	username = (char*)request->username->strvalue;
 	password = (char*)request->password->strvalue;
 
@@ -202,7 +208,13 @@ static int ftress_detach(void *instance)
 {
 	ftress_quit(); /* ftress client cleanup */
 
-	free(((struct rlm_ftress_t *)instance)->string);
+	/* free strings */
+	free(((struct rlm_ftress_t *)instance)->default_channel);
+	free(((struct rlm_ftress_t *)instance)->security_domain);
+	free(((struct rlm_ftress_t *)instance)->authentication_type);
+	free(((struct rlm_ftress_t *)instance)->username);
+	free(((struct rlm_ftress_t *)instance)->password);
+
 	free(instance);
 	return 0;
 }
