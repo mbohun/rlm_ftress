@@ -86,7 +86,7 @@ static CONF_PARSER module_config[] = {
  *	Try to avoid putting too much stuff in here - it's better to
  *	do it in instantiate() where it is not global.
  */
-static int ftress_init(void)
+static int ftress_initiate(void) /* to avoid conflict with ftress API */
 {
 	/*
 	 *	Everything's OK, return without an error.
@@ -133,14 +133,47 @@ static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 
 static int example_authenticate(void *instance, REQUEST *request)
 {
-	/* quiet the compiler */
-	instance = instance;
-	request = request;
+	/* extract username and password */
+	char* username;
+	char* password;
+
+	if (!request->username) {
+		radlog(L_AUTH, "rlm_unix: Attribute \"User-Name\" is required for authentication.");
+		return RLM_MODULE_INVALID;
+	}
+
+	if (request->username->length > FTRESS_USERNAME_MAX_LENGTH) {
+		radlog(L_AUTH, "rlm_ftress: username [%s] too long", username);
+		return RLM_MODULE_REJECT;
+	}
+		
+	if (!request->password) {
+		radlog(L_AUTH, "rlm_ftress: Attribute \"User-Password\" is required for authentication.");
+		return RLM_MODULE_INVALID;
+	}
 
 
+	DeviceAuthenticationRequest req =
+		ftress_create_dev_auth_req(argv[1], argv[2]);
 
+	PrimaryDeviceAuthenticationResponse resp =
+		ftress_create_prim_dev_auth_resp();
 
-	return RLM_MODULE_OK;
+	const int result = 
+		ftress_primary_auth_dev(req, resp);
+
+	if (FTRESS_SUCCESS == result) {
+
+		ftress_free_dev_auth_req(req);
+		ftress_free_prim_dev_auth_resp(resp);
+		return RLM_MODULE_OK;
+	} else {
+
+		ftress_free_dev_auth_req(req);
+		ftress_free_prim_dev_auth_resp(resp);
+		return RLM_MODULE_REJECT;
+	}
+
 }
 
 static int ftress_detach(void *instance)
@@ -162,7 +195,7 @@ static int ftress_detach(void *instance)
 module_t rlm_ftress = {
 	"ftress",
 	RLM_TYPE_THREAD_SAFE,		/* type */
-	ftress_init,			/* initialization */
+	ftress_initiate,		/* initialization */
 	ftress_instantiate,		/* instantiation */
 	{
 		ftress_authenticate,	/* authentication */
