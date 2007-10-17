@@ -1,0 +1,13 @@
+TARGET      = @targetname@
+SRCS        = rlm_ftress.c
+HEADERS     = 
+RLM_CFLAGS  = @ftress_cflags@
+RLM_LIBS    = @ftress_ldflags@
+RLM_INSTALL = install-example
+
+include ../rules.mak
+
+$(LT_OBJS): $(HEADERS)
+
+install-example:
+	touch .
