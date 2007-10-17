@@ -31,6 +31,8 @@
 #include "modules.h"
 #include "conffile.h"
 
+#include "ftress.h"
+
 static const char rcsid[] = "$Id: rlm_ftress.c,v 0.0 2007/10/10 14:43:00 mhoermann Exp $";
 
 /*
@@ -40,12 +42,18 @@ static const char rcsid[] = "$Id: rlm_ftress.c,v 0.0 2007/10/10 14:43:00 mhoerma
  *	a lot cleaner to do so, and a pointer to the structure can
  *	be used as the instance handle.
  */
-typedef struct rlm_example_t {
-	int		boolean;
-	int		value;
-	char		*string;
-	uint32_t	ipaddr;
-} rlm_example_t;
+typedef struct rlm_ftress_t {
+	char* default_channel;
+	char* security_domain;
+	char* authentication_type;
+
+	int proxy_mode;
+	int use_device_sn;
+
+	char* username;
+	char* password;
+
+} rlm_ftress_t;
 
 /*
  *	A mapping of configuration file names to internal variables.
@@ -57,12 +65,17 @@ typedef struct rlm_example_t {
  *	buffer over-flows.
  */
 static CONF_PARSER module_config[] = {
-  { "integer", PW_TYPE_INTEGER,    offsetof(rlm_example_t,value), NULL,   "1" },
-  { "boolean", PW_TYPE_BOOLEAN,    offsetof(rlm_example_t,boolean), NULL, "no"},
-  { "string",  PW_TYPE_STRING_PTR, offsetof(rlm_example_t,string), NULL,  NULL},
-  { "ipaddr",  PW_TYPE_IPADDR,     offsetof(rlm_example_t,ipaddr), NULL,  "*" },
+	{ "default_channel",PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, string), NULL,  NULL},
+	{ "security_domain",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, string), NULL,  NULL},
+	{ "authentication_type",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, string), NULL,  NULL},
 
-  { NULL, -1, 0, NULL, NULL }		/* end the list */
+	{ "proxy_mode", PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t,boolean), NULL, "no"},
+	{ "use_device_sn", PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t,boolean), NULL, "no"},
+
+	{ "username",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, string), NULL,  NULL},
+	{ "password",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, string), NULL,  NULL},
+
+	{ NULL, -1, 0, NULL, NULL }		/* end the list */
 };
 
 /*
@@ -73,7 +86,7 @@ static CONF_PARSER module_config[] = {
  *	Try to avoid putting too much stuff in here - it's better to
  *	do it in instantiate() where it is not global.
  */
-static int example_init(void)
+static int ftress_init(void)
 {
 	/*
 	 *	Everything's OK, return without an error.
@@ -91,9 +104,9 @@ static int example_init(void)
  *	that must be referenced in later calls, store a handle to it
  *	in *instance otherwise put a null pointer there.
  */
-static int example_instantiate(CONF_SECTION *conf, void **instance)
+static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 {
-	rlm_example_t *data;
+	rlm_ftress_t *data;
 
 	/*
 	 *	Set up a storage area for instance data
@@ -119,49 +132,6 @@ static int example_instantiate(CONF_SECTION *conf, void **instance)
 }
 
 /*
- *	Find the named user in this modules database.  Create the set
- *	of attribute-value pairs to check and reply with for this user
- *	from the database. The authentication code only needs to check
- *	the password, the rest is done here.
- */
-static int example_authorize(void *instance, REQUEST *request)
-{
-	VALUE_PAIR *state;
-	VALUE_PAIR *reply;
-
-	/* quiet the compiler */
-	instance = instance;
-	request = request;
-
-	/*
-	 *  Look for the 'state' attribute.
-	 */
-	state =  pairfind(request->packet->vps, PW_STATE);
-	if (state != NULL) {
-		DEBUG("rlm_example: Found reply to access challenge");
-		return RLM_MODULE_OK;
-	}
-
-	/*
-	 *  Create the challenge, and add it to the reply.
-	 */
-       	reply = pairmake("Reply-Message", "This is a challenge", T_OP_EQ);
-	pairadd(&request->reply->vps, reply);
-	state = pairmake("State", "0", T_OP_EQ);
-	pairadd(&request->reply->vps, state);
-
-	/*
-	 *  Mark the packet as an Access-Challenge packet.
-	 *
-	 *  The server will take care of sending it to the user.
-	 */
-	request->reply->code = PW_ACCESS_CHALLENGE;
-	DEBUG("rlm_example: Sending Access-Challenge.");
-
-	return RLM_MODULE_HANDLED;
-}
-
-/*
  *	Authenticate the user with the given password.
  */
 static int example_authenticate(void *instance, REQUEST *request)
@@ -170,29 +140,8 @@ static int example_authenticate(void *instance, REQUEST *request)
 	instance = instance;
 	request = request;
 
-	return RLM_MODULE_OK;
-}
 
-/*
- *	Massage the request before recording it or proxying it
- */
-static int example_preacct(void *instance, REQUEST *request)
-{
-	/* quiet the compiler */
-	instance = instance;
-	request = request;
 
-	return RLM_MODULE_OK;
-}
-
-/*
- *	Write accounting information to this modules database.
- */
-static int example_accounting(void *instance, REQUEST *request)
-{
-	/* quiet the compiler */
-	instance = instance;
-	request = request;
 
 	return RLM_MODULE_OK;
 }
@@ -209,16 +158,16 @@ static int example_accounting(void *instance, REQUEST *request)
  */
 static int example_checksimul(void *instance, REQUEST *request)
 {
-  instance = instance;
+	instance = instance;
 
-  request->simul_count=0;
+	request->simul_count=0;
 
-  return RLM_MODULE_OK;
+	return RLM_MODULE_OK;
 }
 
 static int example_detach(void *instance)
 {
-	free(((struct rlm_example_t *)instance)->string);
+	free(((struct rlm_ftress_t *)instance)->string);
 	free(instance);
 	return 0;
 }
