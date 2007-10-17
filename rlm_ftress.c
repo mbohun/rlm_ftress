@@ -138,12 +138,15 @@ static int example_authenticate(void *instance, REQUEST *request)
 	char* password;
 
 	if (!request->username) {
-		radlog(L_AUTH, "rlm_unix: Attribute \"User-Name\" is required for authentication.");
+		radlog(L_AUTH, "rlm_ftress: Attribute \"User-Name\" is required for authentication.");
 		return RLM_MODULE_INVALID;
 	}
 
 	if (request->username->length > FTRESS_USERNAME_MAX_LENGTH) {
-		radlog(L_AUTH, "rlm_ftress: username [%s] too long", username);
+		radlog(L_AUTH, 
+		       "rlm_ftress: username [%s] exceeds max length (%d)", 
+		       username,
+		       FTRESS_USERNAME_MAX_LENGTH);
 		return RLM_MODULE_REJECT;
 	}
 		
