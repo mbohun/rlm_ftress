@@ -131,9 +131,6 @@ static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 	return 0;
 }
 
-/*
- *	Authenticate the user with the given password.
- */
 static int example_authenticate(void *instance, REQUEST *request)
 {
 	/* quiet the compiler */
@@ -146,26 +143,7 @@ static int example_authenticate(void *instance, REQUEST *request)
 	return RLM_MODULE_OK;
 }
 
-/*
- *	See if a user is already logged in. Sets request->simul_count to the
- *	current session count for this user and sets request->simul_mpp to 2
- *	if it looks like a multilink attempt based on the requested IP
- *	address, otherwise leaves request->simul_mpp alone.
- *
- *	Check twice. If on the first pass the user exceeds his
- *	max. number of logins, do a second pass and validate all
- *	logins by querying the terminal server (using eg. SNMP).
- */
-static int example_checksimul(void *instance, REQUEST *request)
-{
-	instance = instance;
-
-	request->simul_count=0;
-
-	return RLM_MODULE_OK;
-}
-
-static int example_detach(void *instance)
+static int ftress_detach(void *instance)
 {
 	free(((struct rlm_ftress_t *)instance)->string);
 	free(instance);
