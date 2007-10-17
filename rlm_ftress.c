@@ -128,6 +128,8 @@ static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 
 	*instance = data;
 
+	ftress_init(); /* initialize the ftress client library */
+
 	return 0;
 }
 
@@ -138,26 +140,44 @@ static int example_authenticate(void *instance, REQUEST *request)
 	char* password;
 
 	if (!request->username) {
-		radlog(L_AUTH, "rlm_ftress: Attribute \"User-Name\" is required for authentication.");
+		radlog(L_AUTH, 
+		       "rlm_ftress: Attribute \"User-Name\" is required for authentication.");
+
 		return RLM_MODULE_INVALID;
 	}
 
 	if (request->username->length > FTRESS_USERNAME_MAX_LENGTH) {
 		radlog(L_AUTH, 
-		       "rlm_ftress: username [%s] exceeds max length (%d)", 
+		       "rlm_ftress: username [%s] exceeds max length [%d]", 
 		       username,
 		       FTRESS_USERNAME_MAX_LENGTH);
+
 		return RLM_MODULE_REJECT;
 	}
-		
+
 	if (!request->password) {
-		radlog(L_AUTH, "rlm_ftress: Attribute \"User-Password\" is required for authentication.");
+		radlog(L_AUTH, 
+		       "rlm_ftress: Attribute \"User-Password\" is required for authentication.");
+
 		return RLM_MODULE_INVALID;
 	}
 
+	/* check if it is plain text */
+	if (request->password->attribute != PW_PASSWORD) {
+		radlog(L_AUTH, 
+		       "rlm_ftress: Attribute \"User-Password\" is required for authentication. "
+		       "Cannot use \"%s\".", request->password->name);
+
+		return RLM_MODULE_INVALID;
+	}
+
+	/* do we have to check password length? */
+
+	username = (char*)request->username->strvalue;
+	password = (char*)request->password->strvalue;
 
 	DeviceAuthenticationRequest req =
-		ftress_create_dev_auth_req(argv[1], argv[2]);
+		ftress_create_dev_auth_req(username, password);
 
 	PrimaryDeviceAuthenticationResponse resp =
 		ftress_create_prim_dev_auth_resp();
@@ -166,7 +186,6 @@ static int example_authenticate(void *instance, REQUEST *request)
 		ftress_primary_auth_dev(req, resp);
 
 	if (FTRESS_SUCCESS == result) {
-
 		ftress_free_dev_auth_req(req);
 		ftress_free_prim_dev_auth_resp(resp);
 		return RLM_MODULE_OK;
@@ -181,6 +200,8 @@ static int example_authenticate(void *instance, REQUEST *request)
 
 static int ftress_detach(void *instance)
 {
+	ftress_quit(); /* ftress client cleanup */
+
 	free(((struct rlm_ftress_t *)instance)->string);
 	free(instance);
 	return 0;
