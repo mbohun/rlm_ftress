@@ -1,8 +1,8 @@
 TARGET      = @targetname@
 SRCS        = rlm_ftress.c
-HEADERS     = 
+HEADERS     = ftress.h
 RLM_CFLAGS  = @ftress_cflags@
-RLM_LIBS    = @ftress_ldflags@
+RLM_LIBS    = @ftress_ldflags@ -L ./ -lftress -lssl -lcrypto
 RLM_INSTALL = install-example
 
 include ../rules.mak

@@ -88,13 +88,6 @@ static int ftress_initiate(void) /* to avoid conflict with ftress API */
 	return 0;
 }
 
-/* TODO: We can hide these later in a function that is re-initiating this module's
- *       session.
- */
-static ChannelCode channel_code;
-static SecurityDomain security_domain;
-static AuthenticationTypeCode authentication_type_code;
-
 /*
  *	Do any per-module initialization that is separate to each
  *	configured instance of the module.  e.g. set up connections
@@ -134,72 +127,130 @@ static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 	return 0;
 }
 
-static int authenticate_to_ftress() {
+static int ftress_authenticate(void *instance, REQUEST *request) {
 
-}
-
-static int ftress_authenticate(void *instance, REQUEST *request)
-{
 	/* extract username and password */
 	char* username;
 	char* password;
 
-	if (!request->username) {
-		radlog(L_AUTH, 
-		       "rlm_ftress: Attribute \"User-Name\" is required for authentication.");
+	Alsi *alsi = NULL;
+	char *authenticatorEndpoint = "http://192.168.130.30:9080/4TRESSSoap/services/Authenticator-12";
+	AuthenticationResponse authenticationResponse = NULL;
 
-		return RLM_MODULE_INVALID;
-	}
+/* 	if (!request->username) { */
+/* 		radlog(L_AUTH,  */
+/* 		       "rlm_ftress: Attribute \"User-Name\" is required for authentication."); */
 
-	if (request->username->length > FTRESS_USERNAME_MAX_LENGTH) {
-		radlog(L_AUTH, 
-		       "rlm_ftress: username [%s] exceeds max length [%d]", 
-		       username,
-		       FTRESS_USERNAME_MAX_LENGTH);
+/* 		return RLM_MODULE_INVALID; */
+/* 	} */
 
-		return RLM_MODULE_REJECT;
-	}
+/* 	if (request->username->length > FTRESS_USERNAME_MAX_LENGTH) { */
+/* 		radlog(L_AUTH,  */
+/* 		       "rlm_ftress: username [%s] exceeds max length [%d]",  */
+/* 		       username, */
+/* 		       FTRESS_USERNAME_MAX_LENGTH); */
 
-	if (!request->password) {
-		radlog(L_AUTH, 
-		       "rlm_ftress: Attribute \"User-Password\" is required for authentication.");
+/* 		return RLM_MODULE_REJECT; */
+/* 	} */
 
-		return RLM_MODULE_INVALID;
-	}
+/* 	if (!request->password) { */
+/* 		radlog(L_AUTH,  */
+/* 		       "rlm_ftress: Attribute \"User-Password\" is required for authentication."); */
 
-	/* check if it is plain text */
-	if (request->password->attribute != PW_PASSWORD) {
-		radlog(L_AUTH, 
-		       "rlm_ftress: Attribute \"User-Password\" is required for authentication. "
-		       "Cannot use \"%s\".", request->password->name);
+/* 		return RLM_MODULE_INVALID; */
+/* 	} */
 
-		return RLM_MODULE_INVALID;
-	}
+/* 	/\* check if it is plain text *\/ */
+/* 	if (request->password->attribute != PW_PASSWORD) { */
+/* 		radlog(L_AUTH,  */
+/* 		       "rlm_ftress: Attribute \"User-Password\" is required for authentication. " */
+/* 		       "Cannot use \"%s\".", request->password->name); */
+
+/* 		return RLM_MODULE_INVALID; */
+/* 	} */
 
 	/* do we have to check password length? */
 	username = (char*)request->username->strvalue;
 	password = (char*)request->password->strvalue;
 
-	DeviceAuthenticationRequest req =
-		ftress_create_dev_auth_req(username, password);
+	/** Initialise ftress */
+	ftress_init();
 
-	PrimaryDeviceAuthenticationResponse resp =
-		ftress_create_prim_dev_auth_resp();
+	/** Create ChannelCode*/
+	ChannelCode channelCode = ftress_create_channel_code("OPERATOR", 0);
+	
+	/** Create SecurityDomain */
+	SecurityDomain securityDomain  = ftress_create_security_domain("MYDOMAIN");		
+	ftress_set_security_domain(securityDomain, "MYDOMAIN");
 
-	const int result = 
-		ftress_primary_auth_dev(req, resp);
+	/** Create AuthenticationTypeCode */
+	AuthenticationTypeCode authenticationTypeCode = 
+		ftress_create_authentication_type_code("OP_ATCODE");
 
-	if (FTRESS_SUCCESS == result) {
-		ftress_free_dev_auth_req(req);
-		ftress_free_prim_dev_auth_resp(resp);
-		return RLM_MODULE_OK;
-	} else {
+	/** Create UPAuthenticationRequest */
+	UPAuthenticationRequest upAuthenticationRequest	= 
+		ftress_create_up_authentication_request(NULL, 
+							0, 
+							authenticationTypeCode, 
+							NULL ,
+							password, 
+							NULL, 
+							NULL, 
+							username);
 
-		ftress_free_dev_auth_req(req);
-		ftress_free_prim_dev_auth_resp(resp);
-		return RLM_MODULE_REJECT;
+	/** Create PrimaryAuthenticateUPResponse */
+	PrimaryAuthenticateUPResponse primaryAuthenticateUPResponse = 
+		ftress_create_primary_authenticate_up_response();
+
+	/** Call to primaryAuthenticateUP */		
+	int result = 
+		ftress_primary_authenticate_up(authenticatorEndpoint, 
+					       channelCode, 
+					       upAuthenticationRequest, 
+					       securityDomain, 
+					       primaryAuthenticateUPResponse);	
+
+	if (result == FTRESS_SUCCESS)
+	{
+		/** Extract AuthenticationResponse from primaryAuthenticateUPResponse */
+		authenticationResponse = 
+			ftress_get_primary_authenticate_up_authentication_response(primaryAuthenticateUPResponse);
+		
+		/** Extract alsi from AuthenticationResponse */
+		alsi = ftress_get_authentication_response_alsi(authenticationResponse);
+		
+		/** Get charAlsi from alsi */
+		const char *charAlsi = ftress_get_alsi(alsi);
+		
+		if (charAlsi != NULL)
+		{
+			printf("\n Authentication Successful\n");
+			printf("\n ALSI = %s \n", charAlsi);
+		}
+		else 
+		{
+			printf("Please check the failure count \n");
+		}
 	}
+	else 
+	{
+		printf("\n Authentication Failed \n");
+	}
+	/** Free ChannelCode */	
+	ftress_free_channel_code(channelCode);
 
+	/** Free securityDomain */
+	ftress_free_security_domain(securityDomain);
+
+	/** Free authenticationTypeCode */
+	ftress_free_authentication_type_code(authenticationTypeCode);
+	
+	/** Free primaryAuthenticateUPResponse */
+	ftress_free_primary_authenticate_up_response(primaryAuthenticateUPResponse);
+		
+	/** ftress quit */
+	ftress_quit();
+	return 0;
 }
 
 static int ftress_detach(void *instance)
