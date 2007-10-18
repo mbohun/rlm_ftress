@@ -131,8 +131,6 @@ static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 
 	ftress_init(); /* initialize the ftress client library */
 
-	
-
 	return 0;
 }
 
