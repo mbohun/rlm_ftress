@@ -244,3 +244,5 @@ module_t rlm_ftress = {
 	ftress_detach,	/* detach */
 	NULL,		/* destroy */
 };
+
+/* test */
