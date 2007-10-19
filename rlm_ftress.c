@@ -88,6 +88,10 @@ static int ftress_initiate(void) /* to avoid conflict with ftress API */
 	return 0;
 }
 
+static ChannelCode channelCode;
+static SecurityDomain securityDomain;
+static AuthenticationTypeCode authenticationTypeCode;
+
 /*
  *	Do any per-module initialization that is separate to each
  *	configured instance of the module.  e.g. set up connections
@@ -120,10 +124,23 @@ static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 		return -1;
 	}
 
+
+
+	/** Initialise ftress */
+	ftress_init();
+
+	/** Create ChannelCode*/
+	channelCode = ftress_create_channel_code(data->default_channel , 0);
+	
+	/** Create SecurityDomain */
+	securityDomain  = ftress_create_security_domain(data->security_domain);		
+	ftress_set_security_domain(securityDomain, data->security_domain); /* check this */
+
+	/** Create AuthenticationTypeCode */
+	authenticationTypeCode = 
+		ftress_create_authentication_type_code(data->authentication_type);
+
 	*instance = data;
-
-	ftress_init(); /* initialize the ftress client library */
-
 	return 0;
 }
 
@@ -133,9 +150,9 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 	char* username;
 	char* password;
 
-	Alsi *alsi = NULL;
-	char *authenticatorEndpoint = "http://192.168.130.30:9080/4TRESSSoap/services/Authenticator-12";
-	AuthenticationResponse authenticationResponse = NULL;
+/* TODO: this is most likely going to be part of ftress.a configuration */
+	const char *authenticatorEndpoint = "http://192.168.130.30:9080/4TRESSSoap/services/Authenticator-12";
+	
 
 /* 	if (!request->username) { */
 /* 		radlog(L_AUTH,  */
@@ -173,20 +190,6 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 	username = (char*)request->username->strvalue;
 	password = (char*)request->password->strvalue;
 
-	/** Initialise ftress */
-	ftress_init();
-
-	/** Create ChannelCode*/
-	ChannelCode channelCode = ftress_create_channel_code("OPERATOR", 0);
-	
-	/** Create SecurityDomain */
-	SecurityDomain securityDomain  = ftress_create_security_domain("MYDOMAIN");		
-	ftress_set_security_domain(securityDomain, "MYDOMAIN");
-
-	/** Create AuthenticationTypeCode */
-	AuthenticationTypeCode authenticationTypeCode = 
-		ftress_create_authentication_type_code("OP_ATCODE");
-
 	/** Create UPAuthenticationRequest */
 	UPAuthenticationRequest upAuthenticationRequest	= 
 		ftress_create_up_authentication_request(NULL, 
@@ -210,32 +213,50 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 					       securityDomain, 
 					       primaryAuthenticateUPResponse);	
 
-	if (result == FTRESS_SUCCESS)
-	{
+	if (result == FTRESS_SUCCESS) {
+
 		/** Extract AuthenticationResponse from primaryAuthenticateUPResponse */
-		authenticationResponse = 
+		AuthenticationResponse authenticationResponse = 
 			ftress_get_primary_authenticate_up_authentication_response(primaryAuthenticateUPResponse);
 		
 		/** Extract alsi from AuthenticationResponse */
-		alsi = ftress_get_authentication_response_alsi(authenticationResponse);
+		Alsi* alsi = ftress_get_authentication_response_alsi(authenticationResponse);
 		
 		/** Get charAlsi from alsi */
 		const char *charAlsi = ftress_get_alsi(alsi);
-		
-		if (charAlsi != NULL)
+
+/* TODO: fix all memory leaks !!! */
+
+		if (NULL != charAlsi)
 		{
 			printf("\n Authentication Successful\n");
 			printf("\n ALSI = %s \n", charAlsi);
+			/** Free primaryAuthenticateUPResponse */
+			ftress_free_primary_authenticate_up_response(primaryAuthenticateUPResponse);
+			return RLM_MODULE_OK;
 		}
 		else 
 		{
 			printf("Please check the failure count \n");
+			/** Free primaryAuthenticateUPResponse */
+			ftress_free_primary_authenticate_up_response(primaryAuthenticateUPResponse);
+			return RLM_MODULE_REJECT;
 		}
 	}
 	else 
 	{
 		printf("\n Authentication Failed \n");
+		/** Free primaryAuthenticateUPResponse */
+		ftress_free_primary_authenticate_up_response(primaryAuthenticateUPResponse);
+		return RLM_MODULE_REJECT;
 	}
+		
+	return RLM_MODULE_REJECT;
+}
+
+static int ftress_detach(void *instance)
+{
+
 	/** Free ChannelCode */	
 	ftress_free_channel_code(channelCode);
 
@@ -244,17 +265,7 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 
 	/** Free authenticationTypeCode */
 	ftress_free_authentication_type_code(authenticationTypeCode);
-	
-	/** Free primaryAuthenticateUPResponse */
-	ftress_free_primary_authenticate_up_response(primaryAuthenticateUPResponse);
-		
-	/** ftress quit */
-	ftress_quit();
-	return 0;
-}
 
-static int ftress_detach(void *instance)
-{
 	ftress_quit(); /* ftress client cleanup */
 
 	/* free strings */
