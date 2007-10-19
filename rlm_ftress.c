@@ -50,6 +50,7 @@ typedef struct rlm_ftress_t {
 	int use_device_sn;
 	char* username;
 	char* password;
+	char* endpoint;
 } rlm_ftress_t;
 
 /*
@@ -69,6 +70,7 @@ static CONF_PARSER module_config[] = {
 	{ "use_device_sn",       PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, use_device_sn),       NULL, "no"},
 	{ "username",            PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, username),            NULL,  NULL},
 	{ "password",            PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, password),            NULL,  NULL},
+	{ "endpoint",            PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, endpoint),            NULL,  NULL},	
 	{ NULL, -1, 0, NULL, NULL }
 };
 
@@ -124,8 +126,6 @@ static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 		return -1;
 	}
 
-
-
 	/** Initialise ftress */
 	ftress_init();
 
@@ -150,10 +150,7 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 	char* username;
 	char* password;
 
-/* TODO: this is most likely going to be part of ftress.a configuration */
-	const char *authenticatorEndpoint = 
-		"http://192.168.130.23:9080/4TRESSSoap/services/Authenticator-12";
-	
+	const char* endpoint = ((struct rlm_ftress_t*)instance)->endpoint;
 
 /* 	if (!request->username) { */
 /* 		radlog(L_AUTH,  */
@@ -206,9 +203,10 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 	PrimaryAuthenticateUPResponse primaryAuthenticateUPResponse = 
 		ftress_create_primary_authenticate_up_response();
 
+/* TODO: this is most likely going to be part of ftress.a configuration */
 	/** Call to primaryAuthenticateUP */		
 	int result = 
-		ftress_primary_authenticate_up(authenticatorEndpoint, 
+		ftress_primary_authenticate_up(endpoint, 
 					       channelCode, 
 					       upAuthenticationRequest, 
 					       securityDomain, 
@@ -257,7 +255,6 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 
 static int ftress_detach(void *instance)
 {
-
 	/** Free ChannelCode */	
 	ftress_free_channel_code(channelCode);
 
@@ -275,7 +272,7 @@ static int ftress_detach(void *instance)
 	free(((struct rlm_ftress_t *)instance)->authentication_type);
 	free(((struct rlm_ftress_t *)instance)->username);
 	free(((struct rlm_ftress_t *)instance)->password);
-
+	free(((struct rlm_ftress_t *)instance)->endpoint);
 	free(instance);
 	return 0;
 }
