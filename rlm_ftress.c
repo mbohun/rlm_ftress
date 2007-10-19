@@ -151,7 +151,8 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 	char* password;
 
 /* TODO: this is most likely going to be part of ftress.a configuration */
-	const char *authenticatorEndpoint = "http://192.168.130.30:9080/4TRESSSoap/services/Authenticator-12";
+	const char *authenticatorEndpoint = 
+		"http://192.168.130.23:9080/4TRESSSoap/services/Authenticator-12";
 	
 
 /* 	if (!request->username) { */
