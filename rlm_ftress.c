@@ -222,7 +222,7 @@ static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 	*instance = data;
 
 	module_alsi = authenticate_module_to_ftress(data);
-	if (NULL == module_alsi) {
+	if (NULL != module_alsi) {
 		const char* alsi_str = ftress_get_alsi(module_alsi);
 		if (NULL != alsi_str) {
 			radlog(L_AUTH, "rlm_ftress: module successfully authenticated to 4TRESS server.");
