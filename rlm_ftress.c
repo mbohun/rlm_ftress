@@ -94,6 +94,23 @@ static ChannelCode channelCode;
 static SecurityDomain securityDomain;
 static AuthenticationTypeCode authenticationTypeCode;
 
+/* authenticates this module to 4TRESS server in order to do:
+ * - ftress_indirect_primary_authenticate_device()
+ * - ftress_reset_authenticator_failed_authentication_count()
+ */
+static int authenticate_module_to_ftress() {
+	return -1;
+}
+
+/* TODO:
+ * if in proxy mode and the authentication to a 3rd party RADIUS
+ * server was success decrease the authentication failure count
+ * on the 4TRESS server.
+ */
+static int decrease_ftress_authentication_failure_count(void *instance, REQUEST *request) {
+	return -1;
+}
+
 /*
  *	Do any per-module initialization that is separate to each
  *	configured instance of the module.  e.g. set up connections
