@@ -43,14 +43,24 @@ static const char rcsid[] = "$Id: rlm_ftress.c,v 0.0 2007/10/10 14:43:00 mhoerma
  *	be used as the instance handle.
  */
 typedef struct rlm_ftress_t {
-	char* default_channel;
+	char* admin_authentication_type_code;
+
+	char* server_authentication_type_code;
+	char* server_channel;
+	char* server_username;
+	char* server_password;
+
+	char* user_channel;
+	char* user_authentication_type_code;
+
 	char* security_domain;
-	char* authentication_type;
-	int proxy_mode;
+
 	int use_device_sn;
-	char* username;
-	char* password;
-	char* endpoint;
+
+	int proxy_mode;
+
+	char* endpoint_authenticator;
+	char* endpoint_authenticator_manager;
 } rlm_ftress_t;
 
 /*
@@ -63,14 +73,25 @@ typedef struct rlm_ftress_t {
  *	buffer over-flows.
  */
 static CONF_PARSER module_config[] = {
-	{ "default_channel",     PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, default_channel),     NULL,  NULL},
-	{ "security_domain",     PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, security_domain),     NULL,  NULL},
-	{ "authentication_type", PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, authentication_type), NULL,  NULL},
-	{ "proxy_mode",          PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, proxy_mode),          NULL, "no"},
-	{ "use_device_sn",       PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, use_device_sn),       NULL, "no"},
-	{ "username",            PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, username),            NULL,  NULL},
-	{ "password",            PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, password),            NULL,  NULL},
-	{ "endpoint",            PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, endpoint),            NULL,  NULL},	
+	{ "admin_authentication_type_code",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, admin_authentication_type_code),  NULL,  NULL},
+
+	{ "server_authentication_type_code", PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, server_authentication_type_code), NULL,  NULL},
+	{ "server_channel",                  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, server_channel),                  NULL,  NULL},
+	{ "server_username",                 PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, server_username),                 NULL,  NULL},
+	{ "server_password",                 PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, server_password),                 NULL,  NULL},
+
+	{ "user_channel",                    PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, user_channel),                    NULL,  NULL},
+	{ "user_authentication_type_code",   PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, user_authentication_type_code),   NULL,  NULL},
+
+	{ "security_domain",                 PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, security_domain),                 NULL,  NULL},
+
+	{ "use_device_sn",                   PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, use_device_sn),                   NULL, "no"},
+
+	{ "proxy_mode",                      PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, proxy_mode),                      NULL, "no"},
+
+	{ "endpoint_authenticator",          PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, endpoint_authenticator),          NULL,  NULL},
+	{ "endpoint_authenticator_manager",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, endpoint_authenticator_manager),  NULL,  NULL},
+	
 	{ NULL, -1, 0, NULL, NULL }
 };
 
@@ -147,7 +168,7 @@ static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 	ftress_init();
 
 	/** Create ChannelCode*/
-	channelCode = ftress_create_channel_code(data->default_channel , 0);
+	channelCode = ftress_create_channel_code(data->server_channel , 0);
 	
 	/** Create SecurityDomain */
 	securityDomain  = ftress_create_security_domain(data->security_domain);		
@@ -155,7 +176,7 @@ static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 
 	/** Create AuthenticationTypeCode */
 	authenticationTypeCode = 
-		ftress_create_authentication_type_code(data->authentication_type);
+		ftress_create_authentication_type_code(data->server_authentication_type_code);
 
 	*instance = data;
 	return 0;
@@ -167,7 +188,7 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 	char* username;
 	char* password;
 
-	const char* endpoint = ((struct rlm_ftress_t*)instance)->endpoint;
+	const char* endpoint = ((struct rlm_ftress_t*)instance)->endpoint_authenticator;
 
 /* 	if (!request->username) { */
 /* 		radlog(L_AUTH,  */
@@ -284,12 +305,21 @@ static int ftress_detach(void *instance)
 	ftress_quit(); /* ftress client cleanup */
 
 	/* free strings */
-	free(((struct rlm_ftress_t *)instance)->default_channel);
+	free(((struct rlm_ftress_t *)instance)->admin_authentication_type_code);
+
+	free(((struct rlm_ftress_t *)instance)->server_authentication_type_code);
+	free(((struct rlm_ftress_t *)instance)->server_channel);
+	free(((struct rlm_ftress_t *)instance)->server_username);
+	free(((struct rlm_ftress_t *)instance)->server_password);
+
+	free(((struct rlm_ftress_t *)instance)->user_channel);
+	free(((struct rlm_ftress_t *)instance)->user_authentication_type_code);
+
 	free(((struct rlm_ftress_t *)instance)->security_domain);
-	free(((struct rlm_ftress_t *)instance)->authentication_type);
-	free(((struct rlm_ftress_t *)instance)->username);
-	free(((struct rlm_ftress_t *)instance)->password);
-	free(((struct rlm_ftress_t *)instance)->endpoint);
+
+	free(((struct rlm_ftress_t *)instance)->endpoint_authenticator);
+	free(((struct rlm_ftress_t *)instance)->endpoint_authenticator_manager);
+
 	free(instance);
 	return 0;
 }
