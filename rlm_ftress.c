@@ -244,7 +244,10 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 	char* username;
 	char* password;
 
-	const char* endpoint = ((struct rlm_ftress_t*)instance)->endpoint_authenticator;
+	const struct rlm_ftress_t* config = instance;
+
+	//config->endpoint_authenticator;
+	//config->use_device_sn;
 
 /* 	if (!request->username) { */
 /* 		radlog(L_AUTH,  */
@@ -282,69 +285,67 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 	username = (char*)request->username->strvalue;
 	password = (char*)request->password->strvalue;
 
-	/** Create UPAuthenticationRequest */
-	UPAuthenticationRequest upAuthenticationRequest	= 
-		ftress_create_up_authentication_request(NULL, 
-							0, 
-							user_authentication_type_code, 
-							NULL ,
-							password, 
-							NULL, 
-							NULL, 
-							username);
+	DeviceSearchCriteria device_search_criteria = NULL;
+	UserCode user_code = NULL;
 
-	/** Create PrimaryAuthenticateUPResponse */
-	PrimaryAuthenticateUPResponse primaryAuthenticateUPResponse = 
-		ftress_create_primary_authenticate_up_response();
-
-/* TODO: this is most likely going to be part of ftress.a configuration */
-	/** Call to primaryAuthenticateUP */		
-	int result = 
-		ftress_primary_authenticate_up(endpoint, 
-					       user_channel_code, 
-					       upAuthenticationRequest, 
-					       security_domain, 
-					       primaryAuthenticateUPResponse);	
-
-	if (result == FTRESS_SUCCESS) {
-
-		/** Extract AuthenticationResponse from primaryAuthenticateUPResponse */
-		AuthenticationResponse authenticationResponse = 
-			ftress_get_primary_authenticate_up_authentication_response(primaryAuthenticateUPResponse);
-		
-		/** Extract alsi from AuthenticationResponse */
-		Alsi* alsi = ftress_get_authentication_response_alsi(authenticationResponse);
-		
-		/** Get charAlsi from alsi */
-		const char *charAlsi = ftress_get_alsi(alsi);
-
-/* TODO: fix all memory leaks !!! */
-
-		if (NULL != charAlsi)
-		{
-			printf("\n Authentication Successful\n");
-			printf("\n ALSI = %s \n", charAlsi);
-			/** Free primaryAuthenticateUPResponse */
-			ftress_free_primary_authenticate_up_response(primaryAuthenticateUPResponse);
-			return RLM_MODULE_OK;
-		}
-		else 
-		{
-			printf("Please check the failure count \n");
-			/** Free primaryAuthenticateUPResponse */
-			ftress_free_primary_authenticate_up_response(primaryAuthenticateUPResponse);
-			return RLM_MODULE_REJECT;
-		}
+	if (config->use_device_sn) {
+		ftress_device_search_criteria_create(1, /* TODO: search limit, request proper constant */
+						     0, /* TODO: assigned to user, request proper constant */
+						     NULL,
+						     NULL, /* device id */
+						     NULL, /* device type code */
+						     NULL,
+						     NULL,
+						     90, /* issue number */
+						     username, /* serial number */
+						     NULL,
+						     NULL);
+	} else {
+		user_code = ftress_create_user_code(username);
 	}
-	else 
-	{
-		printf("\n Authentication Failed \n");
-		/** Free primaryAuthenticateUPResponse */
-		ftress_free_primary_authenticate_up_response(primaryAuthenticateUPResponse);
-		return RLM_MODULE_REJECT;
+
+	DeviceAuthenticationRequest req =
+		ftress_device_authentication_request_create(NULL,
+							    0, /* TODO: authenticate no session - request proper constant */
+							    user_authentication_type_code,
+							    NULL,
+							    1, /* TODO: SYNCHRONOUS - request proper constant in ftress.h */
+							    NULL,
+							    device_search_criteria,
+							    password,
+							    user_code);
+	
+	IndirectPrimaryAuthenticateDeviceResponse resp =
+		ftress_indirect_primary_authenticate_device_response_create();
+
+	int authentication_result = RLM_MODULE_REJECT; /* default */
+
+	if (FTRESS_SUCCESS == ftress_indirect_primary_authenticate_device(config->endpoint_authenticator,
+									  module_alsi,
+									  user_channel_code,
+									  req,
+									  security_domain,
+									  resp)) {
+
+		AuthenticationResponse auth_resp =
+			ftress_primary_authenticate_device_get_authentication_response(resp);
+
+		authentication_result =
+			(NULL != ftress_get_authentication_response_alsi(auth_resp)) ? RLM_MODULE_OK : RLM_MODULE_REJECT;
+
+		/* TODO: ? check on who is freeing AuthenticationResponse */
 	}
-		
-	return RLM_MODULE_REJECT;
+
+	ftress_indirect_primary_authenticate_device_response_free(resp);
+	ftress_device_authentication_request_free(req);
+
+	if (config->use_device_sn) {
+		ftress_device_search_criteria_free(device_search_criteria);
+	} else {
+		ftress_free_user_code(user_code);
+	}
+
+	return authentication_result;
 }
 
 static int ftress_detach(void *instance)
