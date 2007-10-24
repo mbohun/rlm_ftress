@@ -118,6 +118,9 @@ static SecurityDomain security_domain;
 
 static AuthenticationTypeCode admin_authentication_type_code;
 
+static ChannelCode user_channel_code;
+static AuthenticationTypeCode user_authentication_type_code; /* TODO: fix NULL pointer */
+
 /* authenticates this module to 4TRESS server in order to do:
  * - ftress_indirect_primary_authenticate_device()
  * - ftress_reset_authenticator_failed_authentication_count()
@@ -233,15 +236,13 @@ static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 		return -1;
 	}
 
-
-
+	user_channel_code = ftress_create_channel_code(data->user_channel , 0);
 	
+	user_authentication_type_code = 
+		ftress_create_authentication_type_code(data->user_authentication_type_code);
 
-	return -1; /* failure */
+	return 0; /* success */
 }
-
-static AuthenticationTypeCode user_authentication_type_code; /* TODO: fix NULL pointer */
-static ChannelCode user_channel_code;
 
 static int ftress_authenticate(void *instance, REQUEST *request) {
 
