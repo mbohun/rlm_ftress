@@ -226,11 +226,16 @@ static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 		const char* alsi_str = ftress_get_alsi(module_alsi);
 		if (NULL != alsi_str) {
 			radlog(L_AUTH, "rlm_ftress: module successfully authenticated to 4TRESS server.");
-			return 0; /* success */
+			/* success */
 		}
+	} else {
+		radlog(L_AUTH, "rlm_ftress: module failed to authenticate to 4TRESS server.");
+		return -1;
 	}
 
-	radlog(L_AUTH, "rlm_ftress: module failed to authenticate to 4TRESS server.");
+
+
+	
 
 	return -1; /* failure */
 }
@@ -296,7 +301,7 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 						     NULL, /* device type code */
 						     NULL,
 						     NULL,
-						     90, /* issue number */
+						     0, /* issue number */
 						     username, /* serial number */
 						     NULL,
 						     NULL);
@@ -320,12 +325,13 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 
 	int authentication_result = RLM_MODULE_REJECT; /* default */
 
-	if (FTRESS_SUCCESS == ftress_indirect_primary_authenticate_device(config->endpoint_authenticator,
-									  module_alsi,
-									  user_channel_code,
-									  req,
-									  security_domain,
-									  resp)) {
+	int crap = ftress_indirect_primary_authenticate_device(config->endpoint_authenticator,
+							       module_alsi,
+							       user_channel_code,
+							       req,
+							       security_domain,
+							       resp);
+	if (FTRESS_SUCCESS == crap) {
 
 		AuthenticationResponse auth_resp =
 			ftress_primary_authenticate_device_get_authentication_response(resp);
@@ -334,17 +340,20 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 			(NULL != ftress_get_authentication_response_alsi(auth_resp)) ? RLM_MODULE_OK : RLM_MODULE_REJECT;
 
 		/* TODO: ? check on who is freeing AuthenticationResponse */
+	} else {
+		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR: %s", ftress_exception_handler(crap));	
 	}
-
+/*
 	ftress_indirect_primary_authenticate_device_response_free(resp);
 	ftress_device_authentication_request_free(req);
-
-	if (config->use_device_sn) {
+*/
+	/* TODO: doublecheck this with Ivan, perhaps a brute force free() on both is ok as well */
+/*	if (config->use_device_sn) {
 		ftress_device_search_criteria_free(device_search_criteria);
 	} else {
 		ftress_free_user_code(user_code);
 	}
-
+*/
 	return authentication_result;
 }
 
