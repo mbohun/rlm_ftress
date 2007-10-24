@@ -236,6 +236,9 @@ static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 		return -1;
 	}
 
+	admin_authentication_type_code = 
+		ftress_create_authentication_type_code(data->admin_authentication_type_code);
+
 	user_channel_code = ftress_create_channel_code(data->user_channel , 0);
 	
 	user_authentication_type_code = 
@@ -291,29 +294,34 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 	username = (char*)request->username->strvalue;
 	password = (char*)request->password->strvalue;
 
+	AuthenticationTypeCode atc = NULL;
+
 	DeviceSearchCriteria device_search_criteria = NULL;
 	UserCode user_code = NULL;
-
+		
 	if (config->use_device_sn) {
-		ftress_device_search_criteria_create(1, /* TODO: search limit, request proper constant */
-						     0, /* TODO: assigned to user, request proper constant */
-						     NULL,
-						     NULL, /* device id */
-						     NULL, /* device type code */
-						     NULL,
-						     NULL,
-						     0, /* issue number */
-						     username, /* serial number */
-						     NULL,
-						     NULL);
+		atc = admin_authentication_type_code;
+		device_search_criteria = 
+			ftress_device_search_criteria_create(1, /* TODO: search limit, request proper constant */
+							     0, /* TODO: assigned to user, request proper constant */
+							     NULL,
+							     NULL, /* device id */
+							     NULL, /* device type code */
+							     NULL,
+							     NULL,
+							     0, /* issue number */
+							     username, /* serial number */
+							     NULL,
+							     NULL);
 	} else {
+		atc = user_authentication_type_code;
 		user_code = ftress_create_user_code(username);
 	}
 
 	DeviceAuthenticationRequest req =
 		ftress_device_authentication_request_create(NULL,
 							    0, /* TODO: authenticate no session - request proper constant */
-							    user_authentication_type_code,
+							    atc,
 							    NULL,
 							    1, /* TODO: SYNCHRONOUS - request proper constant in ftress.h */
 							    NULL,
