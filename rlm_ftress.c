@@ -239,50 +239,33 @@ static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 
 static int ftress_authenticate(void *instance, REQUEST *request) {
 
-	/* extract username and password */
-	char* username;
-	char* password;
-
 	const struct rlm_ftress_t* config = instance;
 
-	//config->endpoint_authenticator;
-	//config->use_device_sn;
+	if (!request->username) {
+		radlog(L_AUTH,
+		       "rlm_ftress: Attribute \"User-Name\" is required for authentication.");
 
-/* 	if (!request->username) { */
-/* 		radlog(L_AUTH,  */
-/* 		       "rlm_ftress: Attribute \"User-Name\" is required for authentication."); */
+		return RLM_MODULE_INVALID;
+	}
 
-/* 		return RLM_MODULE_INVALID; */
-/* 	} */
+	if (!request->password) {
+		radlog(L_AUTH,
+		       "rlm_ftress: Attribute \"User-Password\" is required for authentication.");
 
-/* 	if (request->username->length > FTRESS_USERNAME_MAX_LENGTH) { */
-/* 		radlog(L_AUTH,  */
-/* 		       "rlm_ftress: username [%s] exceeds max length [%d]",  */
-/* 		       username, */
-/* 		       FTRESS_USERNAME_MAX_LENGTH); */
+		return RLM_MODULE_INVALID;
+	}
 
-/* 		return RLM_MODULE_REJECT; */
-/* 	} */
+	if (request->password->attribute != PW_PASSWORD) {
+		radlog(L_AUTH,
+		       "rlm_ftress: Attribute \"User-Password\" contains invalid characters."
+		       "Cannot use \"%s\".", request->password->name);
 
-/* 	if (!request->password) { */
-/* 		radlog(L_AUTH,  */
-/* 		       "rlm_ftress: Attribute \"User-Password\" is required for authentication."); */
-
-/* 		return RLM_MODULE_INVALID; */
-/* 	} */
-
-/* 	/\* check if it is plain text *\/ */
-/* 	if (request->password->attribute != PW_PASSWORD) { */
-/* 		radlog(L_AUTH,  */
-/* 		       "rlm_ftress: Attribute \"User-Password\" is required for authentication. " */
-/* 		       "Cannot use \"%s\".", request->password->name); */
-
-/* 		return RLM_MODULE_INVALID; */
-/* 	} */
+		return RLM_MODULE_INVALID;
+	}
 
 	/* do we have to check password length? */
-	username = (char*)request->username->strvalue;
-	password = (char*)request->password->strvalue;
+	const char* username = (char*)request->username->strvalue;
+	const char* password = (char*)request->password->strvalue;
 
 	AuthenticationTypeCode atc = NULL;
 
