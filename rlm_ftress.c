@@ -347,7 +347,16 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
  * on the 4TRESS server.
  */
 static int ftress_adjust_failure_count(void *instance, REQUEST *request) {
-	radlog(L_AUTH, "rlm_ftress:ftress_adjust_failure_count()...");
+	radlog(L_AUTH, "rlm_ftress:ftress_adjust_failure_count(), proxy responded: %d",
+	       request->proxy_reply->code);
+
+	if (PW_AUTHENTICATION_ACK == request->proxy_reply->code) {
+		radlog(L_AUTH, "rlm_ftress:ftress_adjust_failure_count() ..."
+		       "decreasing 4TRESS failed authentication count");
+	} else { // PW_AUTHENTICATION_REJECT
+		; //nothing to do!
+	}
+	
 	return  RLM_MODULE_OK;
 }
 
