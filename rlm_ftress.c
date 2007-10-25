@@ -177,16 +177,6 @@ static Alsi* authenticate_module_to_ftress(void* instance) {
 	return alsi;
 }
 
-/* TODO:
- * if in proxy mode and the authentication to a 3rd party RADIUS
- * server was success decrease the authentication failure count
- * on the 4TRESS server.
- */
-static int decrease_ftress_authentication_failure_count(void *instance, REQUEST *request) {
-	return -1;
-}
-
-
 /*
  *	Do any per-module initialization that is separate to each
  *	configured instance of the module.  e.g. set up connections
@@ -352,18 +342,29 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 	} else {
 		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR: %s", ftress_exception_handler(crap));	
 	}
-/*
+
 	ftress_indirect_primary_authenticate_device_response_free(resp);
-	ftress_device_authentication_request_free(req);
-*/
-	/* TODO: doublecheck this with Ivan, perhaps a brute force free() on both is ok as well */
-/*	if (config->use_device_sn) {
+	// TODO: BUG: mem management in ftress.a needs fixing
+	// ftress_indirect_primary_authenticate_device_response_free(resp) is
+	// freeing device_search_criteria as well - that 's wrong.
+	// ftress_device_authentication_request_free(req);
+
+	if (config->use_device_sn) {
 		ftress_device_search_criteria_free(device_search_criteria);
 	} else {
 		ftress_free_user_code(user_code);
 	}
-*/
+
 	return authentication_result;
+}
+
+/* TODO:
+ * if in proxy mode and the authentication to a 3rd party RADIUS
+ * server was success decrease the authentication failure count
+ * on the 4TRESS server.
+ */
+static int ftress_adjust_failure_count(void *instance, REQUEST *request) {
+	return -1;
 }
 
 static int ftress_detach(void *instance)
