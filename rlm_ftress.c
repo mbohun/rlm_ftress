@@ -347,7 +347,8 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
  * on the 4TRESS server.
  */
 static int ftress_adjust_failure_count(void *instance, REQUEST *request) {
-	return -1;
+	radlog(L_AUTH, "rlm_ftress:ftress_adjust_failure_count()...");
+	return 0;
 }
 
 static int ftress_detach(void *instance)
@@ -405,7 +406,7 @@ module_t rlm_ftress = {
 		NULL,	/* checksimul */
 		NULL,	/* pre-proxy */
 		NULL,	/* post-proxy */
-		NULL	/* post-auth */
+		ftress_adjust_failure_count  /* post-auth */
 	},
 	ftress_detach,	/* detach */
 	NULL,		/* destroy */
