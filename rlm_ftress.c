@@ -57,10 +57,9 @@ typedef struct rlm_ftress_t {
 
 	int use_device_sn;
 
-	int proxy_mode;
-
 	char* endpoint_authenticator;
 	char* endpoint_authenticator_manager;
+	char* endpoint_device_manager;
 } rlm_ftress_t;
 
 /*
@@ -87,12 +86,11 @@ static CONF_PARSER module_config[] = {
 
 	{ "use_device_sn",                   PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, use_device_sn),                   NULL, "no"},
 
-	{ "proxy_mode",                      PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, proxy_mode),                      NULL, "no"},
-
 	{ "endpoint_authenticator",          PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, endpoint_authenticator),          NULL,  NULL},
 	{ "endpoint_authenticator_manager",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, endpoint_authenticator_manager),  NULL,  NULL},
+	{ "endpoint_device_manager",         PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, endpoint_device_manager),         NULL,  NULL},
 	
-	{ NULL, -1, 0, NULL, NULL }
+	{ NULL, -1, 0, NULL, NULL}
 };
 
 /*
@@ -347,12 +345,32 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
  * on the 4TRESS server.
  */
 static int ftress_adjust_failure_count(void *instance, REQUEST *request) {
+
+	const struct rlm_ftress_t* config = instance;
+
 	radlog(L_AUTH, "rlm_ftress:ftress_adjust_failure_count(), proxy responded: %d",
 	       request->proxy_reply->code);
+
+	// user_code = ftress_create_user_code(username);
 
 	if (PW_AUTHENTICATION_ACK == request->proxy_reply->code) {
 		radlog(L_AUTH, "rlm_ftress:ftress_adjust_failure_count() ..."
 		       "decreasing 4TRESS failed authentication count");
+
+		if (config->use_device_sn) {
+			/* TODO: not implemented yet DeviceManager.searchDevices() */
+		} else {
+	
+		}
+		/* TODO: not implemented yet
+		ftress_reset_device_authenticator_failed_authentication_count(config->endpoint_authenticator_manager,
+									      module_alsi,
+									      server_channel_code,
+									      admin_authentication_type_code,
+									      security_domain,
+									      user_code,
+									      resp);
+		*/
 	} else { // PW_AUTHENTICATION_REJECT
 		; //nothing to do!
 	}
@@ -388,6 +406,7 @@ static int ftress_detach(void *instance)
 
 	free(((struct rlm_ftress_t *)instance)->endpoint_authenticator);
 	free(((struct rlm_ftress_t *)instance)->endpoint_authenticator_manager);
+	free(((struct rlm_ftress_t *)instance)->endpoint_device_manager);
 
 	free(instance);
 	return 0;
