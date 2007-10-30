@@ -4,4 +4,12 @@ semantics.cache
 *.a
 *.so
 *.la
+*.lo
+config.log
+config.status
+configure
 Makefile
+.libs
+autom4te.cache
+install-sh
+missing
