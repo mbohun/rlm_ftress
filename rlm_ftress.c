@@ -109,6 +109,7 @@ static int ftress_initiate(void) /* to avoid conflict with ftress API */
 	return 0;
 }
 
+/* we can bundle these in the instance structure */
 static Alsi* module_alsi;
 
 static ChannelCode server_channel_code;
@@ -128,19 +129,19 @@ static Alsi* authenticate_module_to_ftress(void* instance) {
 	const struct rlm_ftress_t* config = ((struct rlm_ftress_t*)instance);
 
 	/** Create ChannelCode*/
-	server_channel_code = ftress_create_channel_code(config->server_channel , 0);
+	server_channel_code = ftress_channel_code_create(config->server_channel , 0);
 	
 	/** Create SecurityDomain */
-	security_domain  = ftress_create_security_domain(config->security_domain);		
-	ftress_set_security_domain(security_domain, config->security_domain); /* check this */
+	security_domain  = ftress_security_domain_create(config->security_domain);		
+	ftress_security_domain_set_domain(security_domain, config->security_domain); /* check this */
 
 	/** Create AuthenticationTypeCode */
 	AuthenticationTypeCode server_authentication_type_code = 
-		ftress_create_authentication_type_code(config->server_authentication_type_code);
+		ftress_authentication_type_code_create(config->server_authentication_type_code);
 
 	/** Create UPAuthenticationRequest */
 	UPAuthenticationRequest req = 
-		ftress_create_up_authentication_request(NULL, 
+		ftress_up_authentication_request_create(NULL, 
 							0, 
 							server_authentication_type_code, 
 							NULL ,
@@ -150,7 +151,7 @@ static Alsi* authenticate_module_to_ftress(void* instance) {
 							config->server_username);
 
 	/** Create PrimaryAuthenticateUPResponse */
-	PrimaryAuthenticateUPResponse resp = ftress_create_primary_authenticate_up_response();
+	PrimaryAuthenticateUPResponse resp = ftress_primary_authenticate_up_response_create();
 
 	Alsi* alsi = NULL;
 
@@ -159,19 +160,19 @@ static Alsi* authenticate_module_to_ftress(void* instance) {
 							     req, 
 							     security_domain, 
 							     resp)) {
+
 		/** Extract AuthenticationResponse from primaryAuthenticateUPResponse */
-		AuthenticationResponse auth_res = 
-			ftress_get_primary_authenticate_up_authentication_response(resp);
+		AuthenticationResponse auth_res =
+			ftress_primary_authenticate_up_get_authentication_response(resp);
 		
 		/** Extract alsi from AuthenticationResponse */
-		alsi = ftress_get_authentication_response_alsi(auth_res);
-		
+		alsi = ftress_authentication_response_get_alsi(auth_res);
 		/** TODO: free auth_res ? **/
 	}
 	
-	ftress_free_primary_authenticate_up_response(resp);
-	ftress_free_up_authentication_request(req);
-	ftress_free_authentication_type_code(server_authentication_type_code);
+	ftress_primary_authenticate_up_response_free(resp);
+	ftress_up_authentication_request_free(req);
+	ftress_authentication_type_code_free(server_authentication_type_code);
 	return alsi;
 }
 
@@ -214,23 +215,24 @@ static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 
 	module_alsi = authenticate_module_to_ftress(data);
 	if (NULL != module_alsi) {
-		const char* alsi_str = ftress_get_alsi(module_alsi);
+		const char* alsi_str = ftress_alsi_get_alsi(module_alsi);
 		if (NULL != alsi_str) {
 			radlog(L_AUTH, "rlm_ftress: module successfully authenticated to 4TRESS server.");
 			/* success */
 		}
 	} else {
 		radlog(L_AUTH, "rlm_ftress: module failed to authenticate to 4TRESS server.");
+		/* TODO: free alsi? */
 		return -1;
 	}
 
 	admin_authentication_type_code = 
-		ftress_create_authentication_type_code(data->admin_authentication_type_code);
+		ftress_authentication_type_code_create(data->admin_authentication_type_code);
 
-	user_channel_code = ftress_create_channel_code(data->user_channel , 0);
+	user_channel_code = ftress_channel_code_create(data->user_channel , 0);
 	
 	user_authentication_type_code = 
-		ftress_create_authentication_type_code(data->user_authentication_type_code);
+		ftress_authentication_type_code_create(data->user_authentication_type_code);
 
 	return 0; /* success */
 }
@@ -286,7 +288,7 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 							     NULL);
 	} else {
 		atc = user_authentication_type_code;
-		user_code = ftress_create_user_code(username);
+		user_code = ftress_user_code_create(username);
 	}
 
 	DeviceAuthenticationRequest req =
@@ -317,7 +319,7 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 			ftress_primary_authenticate_device_get_authentication_response(resp);
 
 		authentication_result =
-			(NULL != ftress_get_authentication_response_alsi(auth_resp)) ? RLM_MODULE_OK : RLM_MODULE_REJECT;
+			(NULL != ftress_authentication_response_get_alsi(auth_resp)) ? RLM_MODULE_OK : RLM_MODULE_REJECT;
 
 		/* TODO: ? check on who is freeing AuthenticationResponse */
 	} else {
@@ -333,9 +335,10 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 	if (config->use_device_sn) {
 		ftress_device_search_criteria_free(device_search_criteria);
 	} else {
-		ftress_free_user_code(user_code);
+		ftress_user_code_free(user_code);
 	}
 
+	radlog(L_AUTH, "rlm_ftress: ftress_authenticate(): %d", authentication_result);
 	return authentication_result;
 }
 
@@ -344,6 +347,24 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
  * server was success decrease the authentication failure count
  * on the 4TRESS server.
  */
+/*
+extern struct soap* soap;
+extern char* soap_action;
+extern soap_call_ftress__resetDeviceAuthenticatorFailedAuthenticationCount(struct soap*,
+									   char*,
+									   char*,
+									   struct ftressDTO__ALSI*,
+									   struct ftressDTO__ChannelCode*,
+									   struct ftressDTO__UserCode*,
+									   struct ftressDTO__AuthenticationTypeCode*,
+									   struct ftressDTO__SecurityDomain*,
+									   struct ftress__resetDeviceAuthenticatorFailedAuthenticationCountResponse*);
+*/
+/* TODO: handle the following scenarios:   
+   1. if user not found on 4TRESS nothing to do here
+   2. if bad pin of 4TRESS we don't decrease the counter
+   
+ */
 static int ftress_adjust_failure_count(void *instance, REQUEST *request) {
 
 	const struct rlm_ftress_t* config = instance;
@@ -351,7 +372,8 @@ static int ftress_adjust_failure_count(void *instance, REQUEST *request) {
 	radlog(L_AUTH, "rlm_ftress:ftress_adjust_failure_count(), proxy responded: %d",
 	       request->proxy_reply->code);
 
-	// user_code = ftress_create_user_code(username);
+	const char* username = (char*)request->username->strvalue;
+	UserCode user_code = ftress_user_code_create(username);
 
 	if (PW_AUTHENTICATION_ACK == request->proxy_reply->code) {
 		radlog(L_AUTH, "rlm_ftress:ftress_adjust_failure_count() ..."
@@ -371,23 +393,39 @@ static int ftress_adjust_failure_count(void *instance, REQUEST *request) {
 									      user_code,
 									      resp);
 		*/
+
+/*
+		struct ftress__resetDeviceAuthenticatorFailedAuthenticationCountResponse* resp =
+			malloc(sizeof (struct ftress__resetDeviceAuthenticatorFailedAuthenticationCountResponse));
+		
+		soap_call_ftress__resetDeviceAuthenticatorFailedAuthenticationCount(soap,
+										    config->endpoint_authenticator_manager, 
+										    soap_action,
+										    module_alsi,  
+										    server_channel_code,  
+										    user_code,
+										    admin_authentication_type_code, 
+										    security_domain, 
+										    resp);
+*/
 	} else { // PW_AUTHENTICATION_REJECT
 		; //nothing to do!
 	}
 	
+	ftress_user_code_free(user_code);
+
 	return  RLM_MODULE_OK;
 }
 
 static int ftress_detach(void *instance)
 {
-	/** Free ChannelCode */	
-	//ftress_free_channel_code(channelCode);
 
-	/** Free securityDomain */
+	/* TODO: who is responsible for freeing module_alsi ? */ 
+	ftress_free_channel_code(server_channel_code);
 	ftress_free_security_domain(security_domain);
-
-	/** Free authenticationTypeCode */
 	ftress_free_authentication_type_code(admin_authentication_type_code);
+	ftress_free_channel_code(user_channel_code);
+	ftress_free_authentication_type_code(user_authentication_type_code);
 
 	ftress_quit(); /* ftress client cleanup */
 
