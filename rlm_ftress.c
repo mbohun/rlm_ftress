@@ -55,11 +55,21 @@ typedef struct rlm_ftress_t {
 
 	char* security_domain;
 
-	int use_device_sn;
+	int use_device_sn; /* TODO: change to string */
 
 	char* endpoint_authenticator;
 	char* endpoint_authenticator_manager;
 	char* endpoint_device_manager;
+
+/* 'global' variables */
+/*
+	Alsi* module_alsi;
+	ChannelCode server_channel_code;
+	SecurityDomain security_domain;
+	AuthenticationTypeCode admin_authentication_type_code;
+	ChannelCode user_channel_code;
+	AuthenticationTypeCode user_authentication_type_code;
+*/
 } rlm_ftress_t;
 
 /*
@@ -323,6 +333,7 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 
 		/* TODO: ? check on who is freeing AuthenticationResponse */
 	} else {
+		/* TODO: ftress_exception_handler is not exposed in ftress.h */
 		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR: %s", ftress_exception_handler(crap));	
 	}
 
