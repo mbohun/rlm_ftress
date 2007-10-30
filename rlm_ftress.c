@@ -33,8 +33,6 @@
 
 #include "ftress.h"
 
-static const char rcsid[] = "$Id: rlm_ftress.c,v 0.0 2007/10/10 14:43:00 mhoermann Exp $";
-
 /*
  *	Define a structure for our module configuration.
  *
@@ -353,24 +351,6 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
 	return authentication_result;
 }
 
-/* TODO:
- * if in proxy mode and the authentication to a 3rd party RADIUS
- * server was success decrease the authentication failure count
- * on the 4TRESS server.
- */
-/*
-extern struct soap* soap;
-extern char* soap_action;
-extern soap_call_ftress__resetDeviceAuthenticatorFailedAuthenticationCount(struct soap*,
-									   char*,
-									   char*,
-									   struct ftressDTO__ALSI*,
-									   struct ftressDTO__ChannelCode*,
-									   struct ftressDTO__UserCode*,
-									   struct ftressDTO__AuthenticationTypeCode*,
-									   struct ftressDTO__SecurityDomain*,
-									   struct ftress__resetDeviceAuthenticatorFailedAuthenticationCountResponse*);
-*/
 /* TODO: handle the following scenarios:   
    1. if user not found on 4TRESS nothing to do here
    2. if bad pin of 4TRESS we don't decrease the counter
@@ -405,20 +385,6 @@ static int ftress_adjust_failure_count(void *instance, REQUEST *request) {
 									      resp);
 		*/
 
-/*
-		struct ftress__resetDeviceAuthenticatorFailedAuthenticationCountResponse* resp =
-			malloc(sizeof (struct ftress__resetDeviceAuthenticatorFailedAuthenticationCountResponse));
-		
-		soap_call_ftress__resetDeviceAuthenticatorFailedAuthenticationCount(soap,
-										    config->endpoint_authenticator_manager, 
-										    soap_action,
-										    module_alsi,  
-										    server_channel_code,  
-										    user_code,
-										    admin_authentication_type_code, 
-										    security_domain, 
-										    resp);
-*/
 	} else { // PW_AUTHENTICATION_REJECT
 		; //nothing to do!
 	}
@@ -488,6 +454,3 @@ module_t rlm_ftress = {
 	ftress_detach,	/* detach */
 	NULL,		/* destroy */
 };
-
-/* test */
-
