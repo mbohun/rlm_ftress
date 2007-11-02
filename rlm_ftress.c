@@ -107,7 +107,7 @@ static CONF_PARSER module_config[] = {
  *	Try to avoid putting too much stuff in here - it's better to
  *	do it in instantiate() where it is not global.
  */
-static int rlm_ftress_init(void) /* to avoid conflict with ftress API */
+static int rlm_ftress_init(void)
 {
 	/*
 	 *	Everything's OK, return without an error.
