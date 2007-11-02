@@ -399,7 +399,7 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 	// TODO: BUG: mem management in ftress.a needs fixing
 	// ftress_indirect_primary_authenticate_device_response_free(resp) is
 	// freeing device_search_criteria as well - that 's wrong.
-	// ftress_device_authentication_request_free(req);
+	ftress_device_authentication_request_free(req);
 
 	free_search_criteria(&user_code, &device_search_criteria);
 
