@@ -69,6 +69,15 @@ typedef struct rlm_ftress_t {
 	ChannelCode user_channel_code;
 	AuthenticationTypeCode user_authentication_type_code;
 
+/* this is just a pointer set depending on the value of conf_radius_username_mapping 
+ * conf_radius_username_mapping = USERNAME => 
+ *            active_authentication_type_code = user_authentication_type_code
+ *
+ * conf_radius_username_mapping = DEVICE_SERIAL_NUMBER => 
+ *            active_authentication_type_code = admin_authentication_type_code
+ */
+	AuthenticationTypeCode active_authentication_type_code;
+
 } rlm_ftress_t;
 
 /*
@@ -166,8 +175,48 @@ static Alsi* authenticate_module_to_ftress(void* instance) {
 	return alsi;
 }
 
-static int rlm_ftress_init(void)
-{
+static void create_search_criteria_device_sn(const char* username, 
+					     UserCode uc, 
+					     DeviceSearchCriteria dsc) {
+	
+	dsc = ftress_device_search_criteria_create(1, /* TODO: search limit, request proper constant */
+						   0, /* TODO: assigned to user, request proper constant */
+						   NULL,
+						   NULL, /* device id */
+						   NULL, /* device type code */
+						   NULL,
+						   NULL,
+						   0, /* issue number */
+						   username, /* serial number */
+						   NULL,
+						   NULL);
+}
+
+static void free_search_criteria_device_sn(UserCode uc, 
+					   DeviceSearchCriteria dsc) {
+	ftress_device_search_criteria_free(dsc);
+}
+
+static void create_search_criteria_username(const char* username, 
+					    UserCode uc,
+					    DeviceSearchCriteria dsc) {
+	uc = ftress_user_code_create(username);
+}
+
+static void free_search_criteria_username(UserCode uc, 
+					  DeviceSearchCriteria dsc) {
+	ftress_user_code_free(uc);
+}
+
+/* these function pointers are assigned depending on the value of conf_radius_username_mapping,
+ * this is to avoid having if/else blocks all over the place.
+ */
+static void (*create_search_criteria) (const char* username, UserCode uc, DeviceSearchCriteria dsc);
+static void (*free_search_criteria) (UserCode uc, DeviceSearchCriteria dsc);
+
+/* module functions */
+
+static int rlm_ftress_init(void) {
 	return 0;
 }
 
@@ -211,14 +260,18 @@ static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 		return -1;
 	}
 
+	data->user_channel_code = ftress_channel_code_create(data->conf_user_channel , 0);
+
 	data->admin_authentication_type_code = 
 		ftress_authentication_type_code_create(data->conf_admin_authentication_type_code);
 
-	data->user_channel_code = ftress_channel_code_create(data->conf_user_channel , 0);
-	
 	data->user_authentication_type_code = 
 		ftress_authentication_type_code_create(data->conf_user_authentication_type_code);
 
+	/* TODO: fix this later */
+	data->active_authentication_type_code = data->user_authentication_type_code;
+	create_search_criteria = create_search_criteria_username;
+	free_search_criteria = free_search_criteria_username;
 	return 0; /* success */
 }
 
@@ -253,34 +306,14 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 	const char* username = (char*)request->username->strvalue;
 	const char* password = (char*)request->password->strvalue;
 
-	AuthenticationTypeCode atc = NULL;
-
 	DeviceSearchCriteria device_search_criteria = NULL;
-	UserCode user_code = NULL;
-		
-	if (config->conf_radius_username_mapping) {
-		atc = config->admin_authentication_type_code;
-		device_search_criteria = 
-			ftress_device_search_criteria_create(1, /* TODO: search limit, request proper constant */
-							     0, /* TODO: assigned to user, request proper constant */
-							     NULL,
-							     NULL, /* device id */
-							     NULL, /* device type code */
-							     NULL,
-							     NULL,
-							     0, /* issue number */
-							     username, /* serial number */
-							     NULL,
-							     NULL);
-	} else {
-		atc = config->user_authentication_type_code;
-		user_code = ftress_user_code_create(username);
-	}
+	UserCode user_code = NULL;		
+	create_search_criteria(username, user_code, device_search_criteria);
 
 	DeviceAuthenticationRequest req =
 		ftress_device_authentication_request_create(NULL,
 							    0, /* TODO: authenticate no session - request proper constant */
-							    atc,
+							    config->active_authentication_type_code,
 							    NULL,
 							    1, /* TODO: SYNCHRONOUS - request proper constant in ftress.h */
 							    NULL,
@@ -300,6 +333,7 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 							    req,
 							    config->security_domain,
 							    resp);
+
 	if (FTRESS_SUCCESS == error_code) {
 		AuthenticationResponse auth_resp =
 			ftress_primary_authenticate_device_get_authentication_response(resp);
@@ -321,11 +355,7 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 	// freeing device_search_criteria as well - that 's wrong.
 	// ftress_device_authentication_request_free(req);
 
-	if (config->conf_radius_username_mapping) { /* TODO: fix this */
-		ftress_device_search_criteria_free(device_search_criteria);
-	} else {
-		ftress_user_code_free(user_code);
-	}
+	free_search_criteria(user_code, device_search_criteria);
 
 	radlog(L_AUTH, "rlm_ftress: ftress_authenticate(): %d", authentication_result);
 	return authentication_result;
@@ -367,9 +397,6 @@ static int rlm_ftress_detach(void *instance)
 }
 
 /*
- *	The module name should be the only globally exported symbol.
- *	That is, everything else should be 'static'.
- *
  *	If the module needs to temporarily modify it's instantiation
  *	data, the type should be changed to RLM_TYPE_THREAD_UNSAFE.
  *	The server will then take care of ensuring that the module
