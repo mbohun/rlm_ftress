@@ -31,41 +31,44 @@
 
 #include "ftress.h"
 
-/*
- *	Define a structure for our module configuration.
- *
- *	These variables do not need to be in a structure, but it's
- *	a lot cleaner to do so, and a pointer to the structure can
- *	be used as the instance handle.
- */
+static struct {
+	int code;
+	char* name;
+	/* function pointer ? */
+} RADIUS_USERNAME_MAPPING_TABLE[] = {
+	{  0, "USERNAME"}, /* default */
+	{  1, "DEVICE_SERIAL_NUMBER"},
+	{ -1, NULL }
+};
+
 typedef struct rlm_ftress_t {
-	char* admin_authentication_type_code;
+/* these are the variables we read from the configuration file, they are prefixed with conf_ */
+	char* conf_admin_authentication_type_code;
 
-	char* server_authentication_type_code;
-	char* server_channel;
-	char* server_username;
-	char* server_password;
+	char* conf_server_authentication_type_code;
+	char* conf_server_channel;
+	char* conf_server_username;
+	char* conf_server_password;
 
-	char* user_channel;
-	char* user_authentication_type_code;
+	char* conf_user_channel;
+	char* conf_user_authentication_type_code;
 
-	char* security_domain;
+	char* conf_security_domain;
 
-	int use_device_sn; /* TODO: change to string */
+	char* conf_endpoint_authenticator;
+	char* conf_endpoint_authenticator_manager;
+	char* conf_endpoint_device_manager;
 
-	char* endpoint_authenticator;
-	char* endpoint_authenticator_manager;
-	char* endpoint_device_manager;
+	int conf_radius_username_mapping;
 
-/* 'global' variables */
-/*
-  Alsi* module_alsi;
-  ChannelCode server_channel_code;
-  SecurityDomain security_domain;
-  AuthenticationTypeCode admin_authentication_type_code;
-  ChannelCode user_channel_code;
-  AuthenticationTypeCode user_authentication_type_code;
-*/
+/* 'global' variables, we constructed  */
+	Alsi* module_alsi;
+	ChannelCode server_channel_code;
+	SecurityDomain security_domain;
+	AuthenticationTypeCode admin_authentication_type_code;
+	ChannelCode user_channel_code;
+	AuthenticationTypeCode user_authentication_type_code;
+
 } rlm_ftress_t;
 
 /*
@@ -78,53 +81,26 @@ typedef struct rlm_ftress_t {
  *	buffer over-flows.
  */
 static CONF_PARSER module_config[] = {
-	{ "admin_authentication_type_code",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, admin_authentication_type_code),  NULL,  NULL},
+	{ "admin_authentication_type_code",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_admin_authentication_type_code),  NULL,  NULL},
 
-	{ "server_authentication_type_code", PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, server_authentication_type_code), NULL,  NULL},
-	{ "server_channel",                  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, server_channel),                  NULL,  NULL},
-	{ "server_username",                 PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, server_username),                 NULL,  NULL},
-	{ "server_password",                 PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, server_password),                 NULL,  NULL},
+	{ "server_authentication_type_code", PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_server_authentication_type_code), NULL,  NULL},
+	{ "server_channel",                  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_server_channel),                  NULL,  NULL},
+	{ "server_username",                 PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_server_username),                 NULL,  NULL},
+	{ "server_password",                 PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_server_password),                 NULL,  NULL},
 
-	{ "user_channel",                    PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, user_channel),                    NULL,  NULL},
-	{ "user_authentication_type_code",   PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, user_authentication_type_code),   NULL,  NULL},
+	{ "user_channel",                    PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_user_channel),                    NULL,  NULL},
+	{ "user_authentication_type_code",   PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_user_authentication_type_code),   NULL,  NULL},
 
-	{ "security_domain",                 PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, security_domain),                 NULL,  NULL},
+	{ "security_domain",                 PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_security_domain),                 NULL,  NULL},
 
-	{ "use_device_sn",                   PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, use_device_sn),                   NULL, "no"},
+	{ "endpoint_authenticator",          PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_endpoint_authenticator),          NULL,  NULL},
+	{ "endpoint_authenticator_manager",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_endpoint_authenticator_manager),  NULL,  NULL},
+	{ "endpoint_device_manager",         PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_endpoint_device_manager),         NULL,  NULL},
 
-	{ "endpoint_authenticator",          PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, endpoint_authenticator),          NULL,  NULL},
-	{ "endpoint_authenticator_manager",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, endpoint_authenticator_manager),  NULL,  NULL},
-	{ "endpoint_device_manager",         PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, endpoint_device_manager),         NULL,  NULL},
+	{ "radius_username_mapping",         PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_radius_username_mapping),         NULL,  0}, /* 0=default */
 	
 	{ NULL, -1, 0, NULL, NULL}
 };
-
-/*
- *	Do any per-module initialization.  e.g. set up connections
- *	to external databases, read configuration files, set up
- *	dictionary entries, etc.
- *
- *	Try to avoid putting too much stuff in here - it's better to
- *	do it in instantiate() where it is not global.
- */
-static int rlm_ftress_init(void)
-{
-	/*
-	 *	Everything's OK, return without an error.
-	 */
-	return 0;
-}
-
-/* we can bundle these in the instance structure */
-static Alsi* module_alsi;
-
-static ChannelCode server_channel_code;
-static SecurityDomain security_domain;
-
-static AuthenticationTypeCode admin_authentication_type_code;
-
-static ChannelCode user_channel_code;
-static AuthenticationTypeCode user_authentication_type_code; /* TODO: fix NULL pointer */
 
 /* authenticates this module to 4TRESS server in order to do:
  * - ftress_indirect_primary_authenticate_device()
@@ -132,18 +108,22 @@ static AuthenticationTypeCode user_authentication_type_code; /* TODO: fix NULL p
  */
 static Alsi* authenticate_module_to_ftress(void* instance) {
 
-	const struct rlm_ftress_t* config = ((struct rlm_ftress_t*)instance);
+	struct rlm_ftress_t* config = instance;
 
 	/** Create ChannelCode*/
-	server_channel_code = ftress_channel_code_create(config->server_channel , 0);
+	config->server_channel_code = 
+		ftress_channel_code_create(config->conf_server_channel, 0);
 	
 	/** Create SecurityDomain */
-	security_domain  = ftress_security_domain_create(config->security_domain);		
-	ftress_security_domain_set_domain(security_domain, config->security_domain); /* check this */
+	config->security_domain = 
+		ftress_security_domain_create(config->conf_security_domain);		
+
+	ftress_security_domain_set_domain(config->security_domain, 
+					  config->conf_security_domain); /* TODO: check if this is required */
 
 	/** Create AuthenticationTypeCode */
 	AuthenticationTypeCode server_authentication_type_code = 
-		ftress_authentication_type_code_create(config->server_authentication_type_code);
+		ftress_authentication_type_code_create(config->conf_server_authentication_type_code);
 
 	/** Create UPAuthenticationRequest */
 	UPAuthenticationRequest req = 
@@ -151,21 +131,22 @@ static Alsi* authenticate_module_to_ftress(void* instance) {
 							0, 
 							server_authentication_type_code, 
 							NULL ,
-							config->server_password, 
+							config->conf_server_password, 
 							NULL, 
 							NULL, 
-							config->server_username);
+							config->conf_server_username);
 
 	/** Create PrimaryAuthenticateUPResponse */
-	PrimaryAuthenticateUPResponse resp = ftress_primary_authenticate_up_response_create();
+	PrimaryAuthenticateUPResponse resp = 
+		ftress_primary_authenticate_up_response_create();
 
 	Alsi* alsi = NULL;
 
 	const int error_code =
-		ftress_primary_authenticate_up(config->endpoint_authenticator, 
-					       server_channel_code, 
+		ftress_primary_authenticate_up(config->conf_endpoint_authenticator, 
+					       config->server_channel_code, 
 					       req, 
-					       security_domain, 
+					       config->security_domain, 
 					       resp);
 
 	if (FTRESS_SUCCESS == error_code) {
@@ -185,16 +166,11 @@ static Alsi* authenticate_module_to_ftress(void* instance) {
 	return alsi;
 }
 
-/*
- *	Do any per-module initialization that is separate to each
- *	configured instance of the module.  e.g. set up connections
- *	to external databases, read configuration files, set up
- *	dictionary entries, etc.
- *
- *	If configuration information is given in the config section
- *	that must be referenced in later calls, store a handle to it
- *	in *instance otherwise put a null pointer there.
- */
+static int rlm_ftress_init(void)
+{
+	return 0;
+}
+
 static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 {
 	rlm_ftress_t *data;
@@ -222,9 +198,9 @@ static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 
 	*instance = data;
 
-	module_alsi = authenticate_module_to_ftress(data);
-	if (NULL != module_alsi) {
-		const char* alsi_str = ftress_alsi_get_alsi(module_alsi);
+	data->module_alsi = authenticate_module_to_ftress(data);
+	if (NULL != data->module_alsi) {
+		const char* alsi_str = ftress_alsi_get_alsi(data->module_alsi);
 		if (NULL != alsi_str) {
 			radlog(L_AUTH, "rlm_ftress: module successfully authenticated to 4TRESS server.");
 			/* success */
@@ -235,13 +211,13 @@ static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 		return -1;
 	}
 
-	admin_authentication_type_code = 
-		ftress_authentication_type_code_create(data->admin_authentication_type_code);
+	data->admin_authentication_type_code = 
+		ftress_authentication_type_code_create(data->conf_admin_authentication_type_code);
 
-	user_channel_code = ftress_channel_code_create(data->user_channel , 0);
+	data->user_channel_code = ftress_channel_code_create(data->conf_user_channel , 0);
 	
-	user_authentication_type_code = 
-		ftress_authentication_type_code_create(data->user_authentication_type_code);
+	data->user_authentication_type_code = 
+		ftress_authentication_type_code_create(data->conf_user_authentication_type_code);
 
 	return 0; /* success */
 }
@@ -282,8 +258,8 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 	DeviceSearchCriteria device_search_criteria = NULL;
 	UserCode user_code = NULL;
 		
-	if (config->use_device_sn) {
-		atc = admin_authentication_type_code;
+	if (config->conf_radius_username_mapping) {
+		atc = config->admin_authentication_type_code;
 		device_search_criteria = 
 			ftress_device_search_criteria_create(1, /* TODO: search limit, request proper constant */
 							     0, /* TODO: assigned to user, request proper constant */
@@ -297,7 +273,7 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 							     NULL,
 							     NULL);
 	} else {
-		atc = user_authentication_type_code;
+		atc = config->user_authentication_type_code;
 		user_code = ftress_user_code_create(username);
 	}
 
@@ -318,11 +294,11 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 	int authentication_result = RLM_MODULE_REJECT; /* default */
 
 	const int error_code = 
-		ftress_indirect_primary_authenticate_device(config->endpoint_authenticator,
-							    module_alsi,
-							    user_channel_code,
+		ftress_indirect_primary_authenticate_device(config->conf_endpoint_authenticator,
+							    config->module_alsi,
+							    config->user_channel_code,
 							    req,
-							    security_domain,
+							    config->security_domain,
 							    resp);
 	if (FTRESS_SUCCESS == error_code) {
 		AuthenticationResponse auth_resp =
@@ -345,7 +321,7 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 	// freeing device_search_criteria as well - that 's wrong.
 	// ftress_device_authentication_request_free(req);
 
-	if (config->use_device_sn) {
+	if (config->conf_radius_username_mapping) { /* TODO: fix this */
 		ftress_device_search_criteria_free(device_search_criteria);
 	} else {
 		ftress_user_code_free(user_code);
@@ -357,33 +333,36 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 
 static int rlm_ftress_detach(void *instance)
 {
-	/* TODO: who is responsible for freeing module_alsi ? */ 
-	ftress_free_channel_code(server_channel_code);
-	ftress_free_security_domain(security_domain);
-	ftress_free_authentication_type_code(admin_authentication_type_code);
-	ftress_free_channel_code(user_channel_code);
-	ftress_free_authentication_type_code(user_authentication_type_code);
+	const struct rlm_ftress_t* data = instance;
 
-	ftress_quit(); /* ftress client cleanup */
+	/* TODO: who is responsible for freeing module_alsi data->module_alsi ? */ 
+	ftress_free_channel_code(data->server_channel_code);
+	ftress_free_security_domain(data->security_domain);
+	ftress_free_authentication_type_code(data->admin_authentication_type_code);
+	ftress_free_channel_code(data->user_channel_code);
+	ftress_free_authentication_type_code(data->user_authentication_type_code);
+
+	/* ftress client cleanup */
+	ftress_quit();
 
 	/* free strings */
-	free(((struct rlm_ftress_t *)instance)->admin_authentication_type_code);
+	free(data->conf_admin_authentication_type_code);
 
-	free(((struct rlm_ftress_t *)instance)->server_authentication_type_code);
-	free(((struct rlm_ftress_t *)instance)->server_channel);
-	free(((struct rlm_ftress_t *)instance)->server_username);
-	free(((struct rlm_ftress_t *)instance)->server_password);
+	free(data->conf_server_authentication_type_code);
+	free(data->conf_server_channel);
+	free(data->conf_server_username);
+	free(data->conf_server_password);
 
-	free(((struct rlm_ftress_t *)instance)->user_channel);
-	free(((struct rlm_ftress_t *)instance)->user_authentication_type_code);
+	free(data->conf_user_channel);
+	free(data->conf_user_authentication_type_code);
 
-	free(((struct rlm_ftress_t *)instance)->security_domain);
+	free(data->conf_security_domain);
 
-	free(((struct rlm_ftress_t *)instance)->endpoint_authenticator);
-	free(((struct rlm_ftress_t *)instance)->endpoint_authenticator_manager);
-	free(((struct rlm_ftress_t *)instance)->endpoint_device_manager);
+	free(data->conf_endpoint_authenticator);
+	free(data->conf_endpoint_authenticator_manager);
+	free(data->conf_endpoint_device_manager);
 
-	free(instance);
+	free(data);
 	return 0;
 }
 
