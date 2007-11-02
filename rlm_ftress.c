@@ -59,12 +59,12 @@ typedef struct rlm_ftress_t {
 
 /* 'global' variables */
 /*
-	Alsi* module_alsi;
-	ChannelCode server_channel_code;
-	SecurityDomain security_domain;
-	AuthenticationTypeCode admin_authentication_type_code;
-	ChannelCode user_channel_code;
-	AuthenticationTypeCode user_authentication_type_code;
+  Alsi* module_alsi;
+  ChannelCode server_channel_code;
+  SecurityDomain security_domain;
+  AuthenticationTypeCode admin_authentication_type_code;
+  ChannelCode user_channel_code;
+  AuthenticationTypeCode user_authentication_type_code;
 */
 } rlm_ftress_t;
 
@@ -161,11 +161,14 @@ static Alsi* authenticate_module_to_ftress(void* instance) {
 
 	Alsi* alsi = NULL;
 
-	if (FTRESS_SUCCESS == ftress_primary_authenticate_up(config->endpoint_authenticator, 
-							     server_channel_code, 
-							     req, 
-							     security_domain, 
-							     resp)) {
+	const int error_code =
+		ftress_primary_authenticate_up(config->endpoint_authenticator, 
+					       server_channel_code, 
+					       req, 
+					       security_domain, 
+					       resp);
+
+	if (FTRESS_SUCCESS == error_code) {
 
 		/** Extract AuthenticationResponse from primaryAuthenticateUPResponse */
 		AuthenticationResponse auth_res =
@@ -314,24 +317,26 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 
 	int authentication_result = RLM_MODULE_REJECT; /* default */
 
-	int crap = ftress_indirect_primary_authenticate_device(config->endpoint_authenticator,
-							       module_alsi,
-							       user_channel_code,
-							       req,
-							       security_domain,
-							       resp);
-	if (FTRESS_SUCCESS == crap) {
-
+	const int error_code = 
+		ftress_indirect_primary_authenticate_device(config->endpoint_authenticator,
+							    module_alsi,
+							    user_channel_code,
+							    req,
+							    security_domain,
+							    resp);
+	if (FTRESS_SUCCESS == error_code) {
 		AuthenticationResponse auth_resp =
 			ftress_primary_authenticate_device_get_authentication_response(resp);
 
 		authentication_result =
-			(NULL != ftress_authentication_response_get_alsi(auth_resp)) ? RLM_MODULE_OK : RLM_MODULE_REJECT;
+			(NULL != ftress_authentication_response_get_alsi(auth_resp))
+			? RLM_MODULE_OK : RLM_MODULE_REJECT;
 
 		/* TODO: ? check on who is freeing AuthenticationResponse */
 	} else {
 		/* TODO: ftress_exception_handler is not exposed in ftress.h */
-		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR: %s", ftress_exception_handler(crap));	
+		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR: %s", 
+		       ftress_exception_handler(error_code));	
 	}
 
 	ftress_indirect_primary_authenticate_device_response_free(resp);
@@ -348,49 +353,6 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 
 	radlog(L_AUTH, "rlm_ftress: ftress_authenticate(): %d", authentication_result);
 	return authentication_result;
-}
-
-/* TODO: handle the following scenarios:   
-   1. if user not found on 4TRESS nothing to do here
-   2. if bad pin of 4TRESS we don't decrease the counter
-   
- */
-static int rlm_ftress_adjust_failure_count(void *instance, REQUEST *request) {
-
-	const struct rlm_ftress_t* config = instance;
-
-	radlog(L_AUTH, "rlm_ftress:ftress_adjust_failure_count(), proxy responded: %d",
-	       request->proxy_reply->code);
-
-	const char* username = (char*)request->username->strvalue;
-	UserCode user_code = ftress_user_code_create(username);
-
-	if (PW_AUTHENTICATION_ACK == request->proxy_reply->code) {
-		radlog(L_AUTH, "rlm_ftress:ftress_adjust_failure_count() ..."
-		       "decreasing 4TRESS failed authentication count");
-
-		if (config->use_device_sn) {
-			/* TODO: not implemented yet DeviceManager.searchDevices() */
-		} else {
-	
-		}
-		/* TODO: not implemented yet
-		ftress_reset_device_authenticator_failed_authentication_count(config->endpoint_authenticator_manager,
-									      module_alsi,
-									      server_channel_code,
-									      admin_authentication_type_code,
-									      security_domain,
-									      user_code,
-									      resp);
-		*/
-
-	} else { // PW_AUTHENTICATION_REJECT
-		; //nothing to do!
-	}
-	
-	ftress_user_code_free(user_code);
-
-	return  RLM_MODULE_OK;
 }
 
 static int rlm_ftress_detach(void *instance)
@@ -425,35 +387,6 @@ static int rlm_ftress_detach(void *instance)
 	return 0;
 }
 
-static int dummy_success(void *instance, REQUEST *request) {
-	return RLM_MODULE_OK;
-}
-
-/* This was only a little (rather desperate) experiment, to trigger our 
- * authentication to be called.
- */
-static int rlm_ftress_authorize(void *instance, REQUEST *request) {
-
-	/* quiet the compiler */
-	instance = instance;
-	request = request;
-
-	if (!request->password) {
-		return RLM_MODULE_NOOP;
-	}
-
-	if (pairfind(request->config_items, PW_AUTHTYPE) != NULL) {
-		DEBUG2("\trlm_ftress: WARNING: Auth-Type already set. Not setting to ftress");
-		return RLM_MODULE_NOOP;
-	}
-
-	DEBUG2("\trlm_ftress: Setting 'Auth-Type := ftress'");
-	pairadd(&request->config_items,
-		pairmake("Auth-Type", "ftress", T_OP_EQ));
-	return RLM_MODULE_OK;
-}
-
-
 /*
  *	The module name should be the only globally exported symbol.
  *	That is, everything else should be 'static'.
@@ -470,12 +403,12 @@ module_t rlm_ftress = {
 	rlm_ftress_instantiate,				/* instantiation */
 	{
 		rlm_ftress_authenticate,		/* authentication */
-		rlm_ftress_authorize,			/* authorization */
+		NULL,					/* authorization */
 		NULL,					/* preaccounting */
 		NULL,					/* accounting */
 		NULL,					/* checksimul */
 		NULL,					/* pre-proxy */
-		rlm_ftress_adjust_failure_count,	/* post-proxy */
+		NULL,					/* post-proxy */
 		NULL					/* post-auth */
 	},
 	rlm_ftress_detach,				/* detach */
