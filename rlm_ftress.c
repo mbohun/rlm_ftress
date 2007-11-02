@@ -38,8 +38,33 @@ static struct {
 } RADIUS_USERNAME_MAPPING_TABLE[] = {
 	{  0, "USERNAME"}, /* default */
 	{  1, "DEVICE_SERIAL_NUMBER"},
-	{ -1, NULL }
+	{ -1, NULL } /* the table has to be terminated with this */
 };
+
+static int is_valid_radius_username_mapping(const int mapping) {
+	int i = 0;
+	while (-1 != RADIUS_USERNAME_MAPPING_TABLE[i].code) {
+		if (mapping == RADIUS_USERNAME_MAPPING_TABLE[i].code) {
+			return 1; /* true */
+		}
+		++i;
+	}
+
+	return 0; /* false */
+}
+
+static void display_radius_username_mapping_info(const int error_mapping) {
+	int i = 0;
+	radlog(L_AUTH, "rlm_ftress: ERROR: radius_username_mapping set to invalid value (%d)!, valid values are:", 
+	       error_mapping);
+
+	while (-1 != RADIUS_USERNAME_MAPPING_TABLE[i].code) {
+		radlog(L_AUTH, "rlm_ftress: radius_username_mapping = %d (%s)", 
+		       RADIUS_USERNAME_MAPPING_TABLE[i].code,
+		       RADIUS_USERNAME_MAPPING_TABLE[i].name);
+		++i;
+	}
+}
 
 typedef struct rlm_ftress_t {
 /* these are the variables we read from the configuration file, they are prefixed with conf_ */
@@ -176,10 +201,10 @@ static Alsi* authenticate_module_to_ftress(void* instance) {
 }
 
 static void create_search_criteria_device_sn(const char* username, 
-					     UserCode uc, 
-					     DeviceSearchCriteria dsc) {
+					     UserCode* uc, 
+					     DeviceSearchCriteria* dsc) {
 	
-	dsc = ftress_device_search_criteria_create(1, /* TODO: search limit, request proper constant */
+	*dsc = ftress_device_search_criteria_create(1, /* TODO: search limit, request proper constant */
 						   0, /* TODO: assigned to user, request proper constant */
 						   NULL,
 						   NULL, /* device id */
@@ -192,27 +217,28 @@ static void create_search_criteria_device_sn(const char* username,
 						   NULL);
 }
 
-static void free_search_criteria_device_sn(UserCode uc, 
-					   DeviceSearchCriteria dsc) {
-	ftress_device_search_criteria_free(dsc);
+static void free_search_criteria_device_sn(UserCode* uc, 
+					   DeviceSearchCriteria* dsc) {
+	ftress_device_search_criteria_free(*dsc);
 }
 
 static void create_search_criteria_username(const char* username, 
-					    UserCode uc,
-					    DeviceSearchCriteria dsc) {
-	uc = ftress_user_code_create(username);
+					    UserCode* uc,
+					    DeviceSearchCriteria* dsc) {
+
+	*uc = ftress_user_code_create(username);
 }
 
-static void free_search_criteria_username(UserCode uc, 
-					  DeviceSearchCriteria dsc) {
-	ftress_user_code_free(uc);
+static void free_search_criteria_username(UserCode* uc, 
+					  DeviceSearchCriteria* dsc) {
+	ftress_user_code_free(*uc);
 }
 
 /* these function pointers are assigned depending on the value of conf_radius_username_mapping,
  * this is to avoid having if/else blocks all over the place.
  */
-static void (*create_search_criteria) (const char* username, UserCode uc, DeviceSearchCriteria dsc);
-static void (*free_search_criteria) (UserCode uc, DeviceSearchCriteria dsc);
+static void (*create_search_criteria) (const char* username, UserCode* uc, DeviceSearchCriteria* dsc);
+static void (*free_search_criteria) (UserCode* uc, DeviceSearchCriteria* dsc);
 
 /* module functions */
 
@@ -238,6 +264,15 @@ static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 	 *	fail.
 	 */
 	if (cf_section_parse(conf, data, module_config) < 0) {
+		free(data);
+		return -1;
+	}
+	
+	/* making our life easier, if the conf_radius_username_mapping is invalid, 
+	 * we don't need to bother with the rest  
+	 */
+	if(!is_valid_radius_username_mapping(data->conf_radius_username_mapping)) {
+		display_radius_username_mapping_info(data->conf_radius_username_mapping);
 		free(data);
 		return -1;
 	}
@@ -307,8 +342,19 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 	const char* password = (char*)request->password->strvalue;
 
 	DeviceSearchCriteria device_search_criteria = NULL;
-	UserCode user_code = NULL;		
-	create_search_criteria(username, user_code, device_search_criteria);
+	UserCode user_code = NULL;
+
+	radlog(L_AUTH,
+	       "rlm_ftress: device_search_criteria = %u, user_code = %u",
+	       device_search_criteria,
+	       user_code);
+		
+	create_search_criteria(username, &user_code, &device_search_criteria);
+
+	radlog(L_AUTH,
+	       "rlm_ftress: device_search_criteria = %u, user_code = %u",
+	       device_search_criteria,
+	       user_code);
 
 	DeviceAuthenticationRequest req =
 		ftress_device_authentication_request_create(NULL,
@@ -355,7 +401,7 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 	// freeing device_search_criteria as well - that 's wrong.
 	// ftress_device_authentication_request_free(req);
 
-	free_search_criteria(user_code, device_search_criteria);
+	free_search_criteria(&user_code, &device_search_criteria);
 
 	radlog(L_AUTH, "rlm_ftress: ftress_authenticate(): %d", authentication_result);
 	return authentication_result;
