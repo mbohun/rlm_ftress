@@ -23,10 +23,8 @@
 
 #include "autoconf.h"
 #include "libradius.h"
-
 #include <stdio.h>
 #include <stdlib.h>
-
 #include "radiusd.h"
 #include "modules.h"
 #include "conffile.h"
@@ -109,7 +107,7 @@ static CONF_PARSER module_config[] = {
  *	Try to avoid putting too much stuff in here - it's better to
  *	do it in instantiate() where it is not global.
  */
-static int ftress_initiate(void) /* to avoid conflict with ftress API */
+static int rlm_ftress_init(void) /* to avoid conflict with ftress API */
 {
 	/*
 	 *	Everything's OK, return without an error.
@@ -194,7 +192,7 @@ static Alsi* authenticate_module_to_ftress(void* instance) {
  *	that must be referenced in later calls, store a handle to it
  *	in *instance otherwise put a null pointer there.
  */
-static int ftress_instantiate(CONF_SECTION *conf, void **instance)
+static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 {
 	rlm_ftress_t *data;
 
@@ -245,7 +243,8 @@ static int ftress_instantiate(CONF_SECTION *conf, void **instance)
 	return 0; /* success */
 }
 
-static int ftress_authenticate(void *instance, REQUEST *request) {
+/* TODO: clean this up, it is getting to long and messy */
+static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 
 	const struct rlm_ftress_t* config = instance;
 
@@ -356,7 +355,7 @@ static int ftress_authenticate(void *instance, REQUEST *request) {
    2. if bad pin of 4TRESS we don't decrease the counter
    
  */
-static int ftress_adjust_failure_count(void *instance, REQUEST *request) {
+static int rlm_ftress_adjust_failure_count(void *instance, REQUEST *request) {
 
 	const struct rlm_ftress_t* config = instance;
 
@@ -394,9 +393,8 @@ static int ftress_adjust_failure_count(void *instance, REQUEST *request) {
 	return  RLM_MODULE_OK;
 }
 
-static int ftress_detach(void *instance)
+static int rlm_ftress_detach(void *instance)
 {
-
 	/* TODO: who is responsible for freeing module_alsi ? */ 
 	ftress_free_channel_code(server_channel_code);
 	ftress_free_security_domain(security_domain);
@@ -427,6 +425,35 @@ static int ftress_detach(void *instance)
 	return 0;
 }
 
+static int dummy_success(void *instance, REQUEST *request) {
+	return RLM_MODULE_OK;
+}
+
+/* This was only a little (rather desperate) experiment, to trigger our 
+ * authentication to be called.
+ */
+static int rlm_ftress_authorize(void *instance, REQUEST *request) {
+
+	/* quiet the compiler */
+	instance = instance;
+	request = request;
+
+	if (!request->password) {
+		return RLM_MODULE_NOOP;
+	}
+
+	if (pairfind(request->config_items, PW_AUTHTYPE) != NULL) {
+		DEBUG2("\trlm_ftress: WARNING: Auth-Type already set. Not setting to ftress");
+		return RLM_MODULE_NOOP;
+	}
+
+	DEBUG2("\trlm_ftress: Setting 'Auth-Type := ftress'");
+	pairadd(&request->config_items,
+		pairmake("Auth-Type", "ftress", T_OP_EQ));
+	return RLM_MODULE_OK;
+}
+
+
 /*
  *	The module name should be the only globally exported symbol.
  *	That is, everything else should be 'static'.
@@ -438,19 +465,19 @@ static int ftress_detach(void *instance)
  */
 module_t rlm_ftress = {
 	"ftress",
-	RLM_TYPE_THREAD_SAFE,		/* type */
-	ftress_initiate,		/* initialization */
-	ftress_instantiate,		/* instantiation */
+	RLM_TYPE_THREAD_SAFE,				/* type */
+	rlm_ftress_init,				/* initialization */
+	rlm_ftress_instantiate,				/* instantiation */
 	{
-		ftress_authenticate,	/* authentication */
-		NULL,	/* authorization */
-		NULL,	/* preaccounting */
-		NULL,	/* accounting */
-		NULL,	/* checksimul */
-		NULL,	/* pre-proxy */
-		ftress_adjust_failure_count,	/* post-proxy */
-		NULL  /* post-auth */
+		rlm_ftress_authenticate,		/* authentication */
+		rlm_ftress_authorize,			/* authorization */
+		NULL,					/* preaccounting */
+		NULL,					/* accounting */
+		NULL,					/* checksimul */
+		NULL,					/* pre-proxy */
+		rlm_ftress_adjust_failure_count,	/* post-proxy */
+		NULL					/* post-auth */
 	},
-	ftress_detach,	/* detach */
-	NULL,		/* destroy */
+	rlm_ftress_detach,				/* detach */
+	NULL,						/* destroy */
 };
