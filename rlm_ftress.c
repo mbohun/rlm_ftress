@@ -205,16 +205,16 @@ static void create_search_criteria_device_sn(const char* username,
 					     DeviceSearchCriteria* dsc) {
 	
 	*dsc = ftress_device_search_criteria_create(1, /* TODO: search limit, request proper constant */
-						   0, /* TODO: assigned to user, request proper constant */
-						   NULL,
-						   NULL, /* device id */
-						   NULL, /* device type code */
-						   NULL,
-						   NULL,
-						   0, /* issue number */
-						   username, /* serial number */
-						   NULL,
-						   NULL);
+						    0, /* TODO: assigned to user, request proper constant */
+						    NULL,
+						    NULL, /* device id */
+						    NULL, /* device type code */
+						    NULL,
+						    NULL,
+						    0, /* issue number */
+						    username, /* serial number */
+						    NULL,
+						    NULL);
 }
 
 static void free_search_criteria_device_sn(UserCode* uc, 
