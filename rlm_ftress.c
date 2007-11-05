@@ -49,15 +49,14 @@ static int is_valid_radius_username_mapping(const int mapping) {
 		}
 		++i;
 	}
-
+	radlog(L_AUTH, 
+	       "rlm_ftress: ERROR: radius_username_mapping set to invalid value (%d)!, valid values are:",
+	       mapping);
 	return 0; /* false */
 }
 
-static void display_radius_username_mapping_info(const int error_mapping) {
+static void display_radius_username_mapping_info() {
 	int i = 0;
-	radlog(L_AUTH, "rlm_ftress: ERROR: radius_username_mapping set to invalid value (%d)!, valid values are:", 
-	       error_mapping);
-
 	while (-1 != RADIUS_USERNAME_MAPPING_TABLE[i].code) {
 		radlog(L_AUTH, "rlm_ftress: radius_username_mapping = %d (%s)", 
 		       RADIUS_USERNAME_MAPPING_TABLE[i].code,
@@ -184,7 +183,6 @@ static Alsi* authenticate_module_to_ftress(void* instance) {
 					       resp);
 
 	if (FTRESS_SUCCESS == error_code) {
-
 		/** Extract AuthenticationResponse from primaryAuthenticateUPResponse */
 		AuthenticationResponse auth_res =
 			ftress_primary_authenticate_up_get_authentication_response(resp);
@@ -204,21 +202,23 @@ static void create_search_criteria_device_sn(const char* username,
 					     UserCode* uc, 
 					     DeviceSearchCriteria* dsc) {
 	
-	*dsc = ftress_device_search_criteria_create(1, /* TODO: search limit, request proper constant */
-						    0, /* TODO: assigned to user, request proper constant */
+	*dsc = ftress_device_search_criteria_create(1,		/* TODO: search limit, request proper constant */
+						    0,		/* TODO: assigned to user, request proper constant */
 						    NULL,
-						    NULL, /* device id */
-						    NULL, /* device type code */
+						    NULL,	/* device id */
+						    NULL,	/* device type code */
 						    NULL,
 						    NULL,
-						    0, /* issue number */
-						    username, /* serial number */
+						    0,		/* issue number */
+						    username,	/* serial number */
 						    NULL,
 						    NULL);
 }
 
-static void free_search_criteria_device_sn(UserCode* uc, 
-					   DeviceSearchCriteria* dsc) {
+static
+void free_search_criteria_device_sn(UserCode* uc, 
+				    DeviceSearchCriteria* dsc)
+{
 	ftress_device_search_criteria_free(*dsc);
 }
 
@@ -272,7 +272,7 @@ static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 	 * we don't need to bother with the rest  
 	 */
 	if(!is_valid_radius_username_mapping(data->conf_radius_username_mapping)) {
-		display_radius_username_mapping_info(data->conf_radius_username_mapping);
+		display_radius_username_mapping_info();
 		free(data);
 		return -1;
 	}
@@ -358,10 +358,10 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 
 	DeviceAuthenticationRequest req =
 		ftress_device_authentication_request_create(NULL,
-							    0, /* TODO: authenticate no session - request proper constant */
+							    0,				/* TODO: authenticate no session - request proper constant */
 							    config->active_authentication_type_code,
 							    NULL,
-							    1, /* TODO: SYNCHRONOUS - request proper constant in ftress.h */
+							    1, 				/* TODO: SYNCHRONOUS - request proper constant in ftress.h */
 							    NULL,
 							    device_search_criteria,
 							    password,
@@ -396,11 +396,7 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 	}
 
 	ftress_indirect_primary_authenticate_device_response_free(resp);
-	// TODO: BUG: mem management in ftress.a needs fixing
-	// ftress_indirect_primary_authenticate_device_response_free(resp) is
-	// freeing device_search_criteria as well - that 's wrong.
 	ftress_device_authentication_request_free(req);
-
 	free_search_criteria(&user_code, &device_search_criteria);
 
 	radlog(L_AUTH, "rlm_ftress: ftress_authenticate(): %d", authentication_result);
