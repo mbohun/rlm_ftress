@@ -85,7 +85,7 @@ typedef struct rlm_ftress_t {
 
 	int conf_radius_username_mapping;
 
-/* 'global' variables, we constructed  */
+/* 'global' variables, we constructed programatically */
 	Alsi* module_alsi;
 	ChannelCode server_channel_code;
 	SecurityDomain security_domain;
