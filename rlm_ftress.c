@@ -234,7 +234,7 @@ static void set_radius_username_mapping_mode(struct rlm_ftress_t* data) {
  * - ftress_indirect_primary_authenticate_device()
  * - ftress_reset_authenticator_failed_authentication_count()
  */
-static Alsi* authenticate_module_to_ftress(void* instance) {
+static int authenticate_module_to_ftress(void* instance) {
 
 	struct rlm_ftress_t* config = instance;
 
@@ -283,14 +283,15 @@ static Alsi* authenticate_module_to_ftress(void* instance) {
 			ftress_primary_authenticate_up_get_authentication_response(resp);
 		
 		/** Extract alsi from AuthenticationResponse */
-		alsi = ftress_authentication_response_get_alsi(auth_res);
+		config->module_alsi = ftress_authentication_response_get_alsi(auth_res);
 		/** TODO: free auth_res ? **/
 	}
 	
 	ftress_primary_authenticate_up_response_free(resp);
 	ftress_up_authentication_request_free(req);
 	ftress_authentication_type_code_free(server_authentication_type_code);
-	return alsi;
+
+	return 0;
 }
 
 /* module functions */
@@ -332,9 +333,8 @@ static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 	/** Initialise ftress */
 	ftress_init();
 
-	*instance = data;
+	authenticate_module_to_ftress(data);
 
-	data->module_alsi = authenticate_module_to_ftress(data);
 	if (NULL != data->module_alsi) {
 		const char* alsi_str = ftress_alsi_get_alsi(data->module_alsi);
 		if (NULL != alsi_str) {
@@ -357,6 +357,8 @@ static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 		ftress_authentication_type_code_create(data->conf_user_authentication_type_code);
 
 	set_radius_username_mapping_mode(data);
+
+	*instance = data;
 	return 0; /* success */
 }
 
