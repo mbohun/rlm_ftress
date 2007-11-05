@@ -71,103 +71,6 @@ typedef struct rlm_ftress_t {
 } rlm_ftress_t;
 
 
-static void create_search_criteria_username(const char* username, 
-					    UserCode* uc,
-					    DeviceSearchCriteria* dsc) {
-
-	*uc = ftress_user_code_create(username);
-}
-
-static void free_search_criteria_username(UserCode* uc, 
-					  DeviceSearchCriteria* dsc) {
-	ftress_user_code_free(*uc);
-}
-
-static void set_active_authentication_type_code_username(struct rlm_ftress_t* data) {
-	data->active_authentication_type_code = data->user_authentication_type_code;
-}
-
-static void create_search_criteria_device_sn(const char* username, 
-					     UserCode* uc, 
-					     DeviceSearchCriteria* dsc) {
-	
-	*dsc = ftress_device_search_criteria_create(1,		/* TODO: search limit, request proper constant */
-						    0,		/* TODO: assigned to user, request proper constant */
-						    NULL,
-						    NULL,	/* device id */
-						    NULL,	/* device type code */
-						    NULL,
-						    NULL,
-						    0,		/* issue number */
-						    username,	/* serial number */
-						    NULL,
-						    NULL);
-}
-
-static
-void free_search_criteria_device_sn(UserCode* uc, 
-				    DeviceSearchCriteria* dsc)
-{
-	ftress_device_search_criteria_free(*dsc);
-}
-
-static void set_active_authentication_type_code_device_sn(struct rlm_ftress_t* data) {
-	data->active_authentication_type_code = data->admin_authentication_type_code;
-	
-}
-
-static struct {
-	int code;
-	char* name;
-	void (*create_search_criteria) (const char* username, UserCode* uc, DeviceSearchCriteria* dsc);
-	void (*free_search_criteria) (UserCode* uc, DeviceSearchCriteria* dsc);
-	void (*set_active_authentication_type_code)(struct rlm_ftress_t* instance);
-} RADIUS_USERNAME_MAPPING_TABLE[] = {
-	/* default */
-	{  
-		0, "USERNAME",
-		create_search_criteria_username,
-		free_search_criteria_username, 
-		set_active_authentication_type_code_username
-	},
-	{  
-		1, "DEVICE_SERIAL_NUMBER",
-		create_search_criteria_device_sn, 
-		free_search_criteria_device_sn,
-		set_active_authentication_type_code_device_sn
-	},
-	/* the table has to be terminated with this */
-	{ -1, NULL,                   
-	  NULL,                             
-	  NULL,
-	  NULL
-	}
-};
-
-static int is_valid_radius_username_mapping(const int mapping) {
-	int i = 0;
-	while (-1 != RADIUS_USERNAME_MAPPING_TABLE[i].code) {
-		if (mapping == RADIUS_USERNAME_MAPPING_TABLE[i].code) {
-			return 1; /* true */
-		}
-		++i;
-	}
-	radlog(L_AUTH, 
-	       "rlm_ftress: ERROR: radius_username_mapping set to invalid value (%d)!, valid values are:",
-	       mapping);
-	return 0; /* false */
-}
-
-static void display_radius_username_mapping_info() {
-	int i = 0;
-	while (-1 != RADIUS_USERNAME_MAPPING_TABLE[i].code) {
-		radlog(L_AUTH, "rlm_ftress: radius_username_mapping = %d (%s)", 
-		       RADIUS_USERNAME_MAPPING_TABLE[i].code,
-		       RADIUS_USERNAME_MAPPING_TABLE[i].name);
-		++i;
-	}
-}
-
 /*
  *	A mapping of configuration file names to internal variables.
  *
@@ -198,6 +101,134 @@ static CONF_PARSER module_config[] = {
 	
 	{ NULL, -1, 0, NULL, NULL}
 };
+
+/* 'USERNAME' mode implementation */
+static void create_search_criteria_username(const char* username, 
+					    UserCode* uc,
+					    DeviceSearchCriteria* dsc) {
+
+	*uc = ftress_user_code_create(username);
+}
+
+static void free_search_criteria_username(UserCode* uc, 
+					  DeviceSearchCriteria* dsc) {
+	ftress_user_code_free(*uc);
+}
+
+static void set_active_authentication_type_code_username(struct rlm_ftress_t* data) {
+	data->active_authentication_type_code = data->user_authentication_type_code;
+}
+
+/* 'DEVICE_SERIAL_NUMBER' mode implementation */
+static void create_search_criteria_device_sn(const char* username, 
+					     UserCode* uc, 
+					     DeviceSearchCriteria* dsc) {
+	
+	*dsc = ftress_device_search_criteria_create(1,		/* TODO: search limit, request proper constant */
+						    0,		/* TODO: assigned to user, request proper constant */
+						    NULL,
+						    NULL,	/* device id */
+						    NULL,	/* device type code */
+						    NULL,
+						    NULL,
+						    0,		/* issue number */
+						    username,	/* serial number */
+						    NULL,
+						    NULL);
+}
+
+static
+void free_search_criteria_device_sn(UserCode* uc, 
+				    DeviceSearchCriteria* dsc)
+{
+	ftress_device_search_criteria_free(*dsc);
+}
+
+static void set_active_authentication_type_code_device_sn(struct rlm_ftress_t* data) {
+	data->active_authentication_type_code = data->admin_authentication_type_code;
+	
+}
+
+/* every mode needs to be registered in this RADIUS_USERNAME_MAPPING_TABLE */
+/* TODO: suggestion we can add 'description' string to the mode struct as well */
+static struct {
+	int code;
+	char* name;
+	void (*create_search_criteria) (const char* username, UserCode* uc, DeviceSearchCriteria* dsc);
+	void (*free_search_criteria) (UserCode* uc, DeviceSearchCriteria* dsc);
+	void (*set_active_authentication_type_code)(struct rlm_ftress_t* instance);
+} RADIUS_USERNAME_MAPPING_TABLE[] = {
+	/* default: USERNAME mode */
+	{  
+		0, "USERNAME",
+		create_search_criteria_username,
+		free_search_criteria_username, 
+		set_active_authentication_type_code_username
+	},
+	/* DEVICE_SERIAL_NUMBER mode */
+	{  
+		1, "DEVICE_SERIAL_NUMBER",
+		create_search_criteria_device_sn, 
+		free_search_criteria_device_sn,
+		set_active_authentication_type_code_device_sn
+	},
+	/* terminator - the table has to be terminated like this */
+	{ -1, NULL,
+	  NULL,
+	  NULL,
+	  NULL
+	}
+};
+
+static int is_valid_radius_username_mapping(const int mapping) {
+	int i = 0;
+	while (-1 != RADIUS_USERNAME_MAPPING_TABLE[i].code) {
+		if (mapping == RADIUS_USERNAME_MAPPING_TABLE[i].code) {
+			return 1; /* true */
+		}
+		++i;
+	}
+	radlog(L_AUTH, 
+	       "rlm_ftress: ERROR: radius_username_mapping set to invalid value (%d)!, valid values are:",
+	       mapping);
+	return 0; /* false */
+}
+
+static void display_radius_username_mapping_info() {
+	int i = 0;
+	while (-1 != RADIUS_USERNAME_MAPPING_TABLE[i].code) {
+		radlog(L_AUTH, "rlm_ftress: radius_username_mapping = %d (%s)", 
+		       RADIUS_USERNAME_MAPPING_TABLE[i].code,
+		       RADIUS_USERNAME_MAPPING_TABLE[i].name);
+		++i;
+	}
+}
+
+/* these function pointers are assigned depending on the value of conf_radius_username_mapping,
+ * this is to avoid having if/else blocks all over the place.
+ */
+static void (*create_search_criteria) (const char* username, UserCode* uc, DeviceSearchCriteria* dsc);
+static void (*free_search_criteria) (UserCode* uc, DeviceSearchCriteria* dsc);
+
+static void set_radius_username_mapping_mode(struct rlm_ftress_t* data) {
+	int i = 0;
+	while (-1 != RADIUS_USERNAME_MAPPING_TABLE[i].code) {
+		if (data->conf_radius_username_mapping == RADIUS_USERNAME_MAPPING_TABLE[i].code) {
+			create_search_criteria = 
+				RADIUS_USERNAME_MAPPING_TABLE[i].create_search_criteria;
+			free_search_criteria =
+				RADIUS_USERNAME_MAPPING_TABLE[i].free_search_criteria;
+
+			RADIUS_USERNAME_MAPPING_TABLE[i].set_active_authentication_type_code(data);
+			
+		}
+		++i;
+	}
+
+	radlog(L_AUTH, 
+	       "rlm_ftress: ERROR: set_radius_username_mapping_mode() FAILED!");
+	
+}
 
 /* authenticates this module to 4TRESS server in order to do:
  * - ftress_indirect_primary_authenticate_device()
@@ -262,35 +293,7 @@ static Alsi* authenticate_module_to_ftress(void* instance) {
 	return alsi;
 }
 
-/* these function pointers are assigned depending on the value of conf_radius_username_mapping,
- * this is to avoid having if/else blocks all over the place.
- */
-static void (*create_search_criteria) (const char* username, UserCode* uc, DeviceSearchCriteria* dsc);
-static void (*free_search_criteria) (UserCode* uc, DeviceSearchCriteria* dsc);
-
-
-static void set_radius_username_mapping_mode(struct rlm_ftress_t* data) {
-	int i = 0;
-	while (-1 != RADIUS_USERNAME_MAPPING_TABLE[i].code) {
-		if (data->conf_radius_username_mapping == RADIUS_USERNAME_MAPPING_TABLE[i].code) {
-			create_search_criteria = 
-				RADIUS_USERNAME_MAPPING_TABLE[i].create_search_criteria;
-			free_search_criteria =
-				RADIUS_USERNAME_MAPPING_TABLE[i].free_search_criteria;
-
-			RADIUS_USERNAME_MAPPING_TABLE[i].set_active_authentication_type_code(data);
-			
-		}
-		++i;
-	}
-
-	radlog(L_AUTH, 
-	       "rlm_ftress: ERROR: set_radius_username_mapping_mode() FAILED!");
-	
-}
-
 /* module functions */
-
 static int rlm_ftress_init(void) {
 	return 0;
 }
