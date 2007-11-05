@@ -220,11 +220,14 @@ static void set_radius_username_mapping_mode(struct rlm_ftress_t* data) {
 				RADIUS_USERNAME_MAPPING_TABLE[i].free_search_criteria;
 
 			RADIUS_USERNAME_MAPPING_TABLE[i].set_active_authentication_type_code(data);
+
+			return; /* success */
 			
 		}
 		++i;
 	}
 
+	/* we should never come here */
 	radlog(L_AUTH, 
 	       "rlm_ftress: ERROR: set_radius_username_mapping_mode() FAILED!");
 	
