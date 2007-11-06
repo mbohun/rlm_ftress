@@ -271,8 +271,6 @@ static int authenticate_module_to_ftress(void* instance) {
 	PrimaryAuthenticateUPResponse resp = 
 		ftress_primary_authenticate_up_response_create();
 
-	Alsi* alsi = NULL;
-
 	const int error_code =
 		ftress_primary_authenticate_up(config->conf_endpoint_authenticator, 
 					       config->server_channel_code, 
