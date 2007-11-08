@@ -195,9 +195,21 @@ static void get_user_code_device_sn(struct rlm_ftress_t* data, const char* devic
 		radlog(L_AUTH, "rlm_ftress: ftress_device_search_results_get_matched_criteria():%d",
 		       ftress_device_search_results_get_matched_criteria(dsr));
 
-		*uc = ftress_device_search_results_get_user_code(dsr);
+		ArrayOfDevices aod = ftress_device_search_results_get_devices(dsr);
 
-		//*uc = ftress_user_code_create("martin"); /* TODO: do the real thing */
+		radlog(L_AUTH, "rlm_ftress: ftress_arrayof_devices_get_size():%d",
+		       ftress_arrayof_devices_get_size(aod));
+
+		Device* devices = ftress_arrayof_devices_get_devices(aod);
+		Device d = devices[0];
+
+		radlog(L_AUTH, "rlm_ftress: device: ftress_device_get_serial_number():%s",
+		       ftress_device_get_serial_number(d));
+
+		UserCode test = ftress_device_get_user_code(d);
+		
+		radlog(L_AUTH, "rlm_ftress: device: %s is assigned to user: %s",
+		       device_serial_number, ftress_user_code_get_code(test));
 
 		/*TODO: who is freeing DeviceSearchResults? */
 	} else {
