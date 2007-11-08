@@ -31,6 +31,9 @@
 
 #include "ftress.h"
 
+/* TODO: request proper error codes */
+#define FTRESS_ERROR_AUTHENTICATE_BAD_OTP RLM_MODULE_REJECT
+
 typedef struct rlm_ftress_t {
 /* these are the variables we read from the configuration file, they are prefixed with conf_ */
 	char* conf_admin_authentication_type_code;
@@ -50,6 +53,10 @@ typedef struct rlm_ftress_t {
 	char* conf_endpoint_device_manager;
 
 	int conf_radius_username_mapping;
+
+	int conf_forward_authentication_mode;
+	uint32_t conf_forward_authentication_server;
+	int conf_forward_authentication_port;
 
 /* 'global' variables, we constructed programatically */
 	Alsi* module_alsi;
@@ -81,24 +88,28 @@ typedef struct rlm_ftress_t {
  *	buffer over-flows.
  */
 static CONF_PARSER module_config[] = {
-	{ "admin_authentication_type_code",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_admin_authentication_type_code),  NULL,  NULL},
+	{ "admin_authentication_type_code",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_admin_authentication_type_code),  NULL, NULL},
 
-	{ "server_authentication_type_code", PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_server_authentication_type_code), NULL,  NULL},
-	{ "server_channel",                  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_server_channel),                  NULL,  NULL},
-	{ "server_username",                 PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_server_username),                 NULL,  NULL},
-	{ "server_password",                 PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_server_password),                 NULL,  NULL},
+	{ "server_authentication_type_code", PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_server_authentication_type_code), NULL, NULL},
+	{ "server_channel",                  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_server_channel),                  NULL, NULL},
+	{ "server_username",                 PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_server_username),                 NULL, NULL},
+	{ "server_password",                 PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_server_password),                 NULL, NULL},
 
-	{ "user_channel",                    PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_user_channel),                    NULL,  NULL},
-	{ "user_authentication_type_code",   PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_user_authentication_type_code),   NULL,  NULL},
+	{ "user_channel",                    PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_user_channel),                    NULL, NULL},
+	{ "user_authentication_type_code",   PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_user_authentication_type_code),   NULL, NULL},
 
-	{ "security_domain",                 PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_security_domain),                 NULL,  NULL},
+	{ "security_domain",                 PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_security_domain),                 NULL, NULL},
 
-	{ "endpoint_authenticator",          PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_endpoint_authenticator),          NULL,  NULL},
-	{ "endpoint_authenticator_manager",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_endpoint_authenticator_manager),  NULL,  NULL},
-	{ "endpoint_device_manager",         PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_endpoint_device_manager),         NULL,  NULL},
+	{ "endpoint_authenticator",          PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_endpoint_authenticator),          NULL, NULL},
+	{ "endpoint_authenticator_manager",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_endpoint_authenticator_manager),  NULL, NULL},
+	{ "endpoint_device_manager",         PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_endpoint_device_manager),         NULL, NULL},
 
-	{ "radius_username_mapping",         PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_radius_username_mapping),         NULL,  0}, /* 0=default */
+	{ "radius_username_mapping",         PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_radius_username_mapping),         NULL, 0   }, /* 0=default */
 	
+	{ "forward_authentication_mode",     PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, conf_forward_authentication_mode),     NULL, "no"}, /* no=default */
+	{ "forward_authentication_server",   PW_TYPE_IPADDR,     offsetof(rlm_ftress_t, conf_forward_authentication_server),   NULL, 0},
+	{ "forward_authentication_port",     PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_forward_authentication_port),     NULL, 0},
+
 	{ NULL, -1, 0, NULL, NULL}
 };
 
@@ -364,82 +375,6 @@ static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 	return 0; /* success */
 }
 
-static int forward_authentication_request(void *instance, REQUEST *request) {
-
-}
-
-static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
-
-	/* should we capture username here before forwarding the request to the 3rd party server? */
-	const struct rlm_ftress_t* data = instance;
-
-	/* at this stage we *NEED* ftress errors, as the different error codes are used to decide
-	 * if the request needs to be forwarded or not.
-	 */
-	const int authenticate_to_ftress = 
-		authenticate_ftress_indirect_primary_device(instance, request);
-
-	if (!data->conf_forward_authentication_mode) {
-		/* authentication forwarding is off - translate ftress error code
-		 * (authenticate_to_ftress) to a RADIUS return code and exit.  
-		 * TODO: translate ftress error to RADIUS response
-		 */
-		return authenticate_to_ftress;
-	}
-
-	/* be explicit about in what situation we want to forward authentication request to a 3rd party server */
-	if (FTRESS_ERROR_AUTHENTICATE_BAD_OTP == authenticate_to_ftress) {
-
-		radlog(L_AUTH, "rlm_ftress: forwarding RADIUS authentication request to %s:%d",
-		       data->conf_forward_authentication_ip,
-		       data->conf_forward_authentication_port);
-		
-		const int forwarding_response =
-			forward_authentication_request(instance, request);
-
-		if (!forwarding_response) {
-			/* forwarding failed, log it, and exit */
-			/* radlog(L_AUTH, ""); */
-			return RLM_MODULE_REJECT;
-		}
-
-		const int error_code =
-			ftress_reset_device_authenticator_failed_authentication_count(data->conf_endpoint_authenticator_manager,
-										      data->module_alsi,
-										      data->server_channel_code,
-										      user_code,
-										      data->admin_authentication_type_code,
-										      data->security_domain,
-										      resp);
-
-		if (FTRESS_SUCCESS == error_code) {
-			radlog(L_AUTH, "rlm_ftress: ");
-			
-		} else {
-
-		}
-
-		return RLM_MODULE_OK;
-		
-	} else {
-		/* NOTHING TO DO, BECAUSE ONE OF THE FOLLOWING IS TRUE: 
-		 * - authentication to ftress server was successful (won't even get here)
-		 * - ftress responded 'error bad pin' (otp was right but pin was wrong)
-		 * - ftress responded 'error user not found'
-		 * - ftress responded 'error failure count reached'
-
-		 FTRESS_ERROR_AUTHENTICATE_BAD_PIN
-		 FTRESS_ERROR_AUTHENTICATE_BAD_OTP
-		 FTRESS_ERROR_AUTHENTICATE_DEVICE_LOCKED
-		 FTRESS_ERROR_AUTHENTICATE_DEVICE_NOT_FOUND
-		 FTRESS_ERROR_AUTHENTICATE_USER_NOT_FOUND
-
-		 */
-	}
-}
-
-
-
 /* TODO: clean this up, it is getting to long and messy */
 static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *request) {
 
@@ -531,6 +466,106 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 
 	radlog(L_AUTH, "rlm_ftress: ftress_authenticate(): %d", authentication_result);
 	return authentication_result;
+}
+
+static int forward_authentication_request(void *instance, REQUEST *request) {
+	return 1;
+}
+
+static int ftress_reset_failed_authentication_count(void *instance, REQUEST *request) {
+	const struct rlm_ftress_t* data = instance;
+
+	/* TODO: add support for device serial numbers here */
+	const char* username = (char*)request->username->strvalue;
+	UserCode user_code = ftress_user_code_create(username);
+
+	ResetDeviceAuthenticatorFailedAuthenticationCountResponse resp =
+		ftress_reset_device_authenticator_failed_authentication_count_response_create();
+
+	const int error_code =
+		ftress_reset_device_authenticator_failed_authentication_count(data->conf_endpoint_authenticator_manager,
+									      data->module_alsi,
+									      data->server_channel_code,
+									      user_code,
+									      data->admin_authentication_type_code,
+									      data->security_domain,
+									      resp);
+	int return_code = 0; /* failure */
+
+	if (FTRESS_SUCCESS == error_code) {
+		radlog(L_AUTH, "rlm_ftress: ");
+		return_code = 1;	
+	} else {
+		/* log error */
+	}
+
+	ftress_reset_device_authenticator_failed_authentication_count_response_free(resp);
+	ftress_user_code_free(user_code);
+
+	return return_code;
+}
+
+static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
+
+	/* should we capture username here before forwarding the request to the 3rd party server? */
+	const struct rlm_ftress_t* data = instance;
+
+	/* at this stage we *NEED* ftress errors, as the different error codes are used to decide
+	 * if the request needs to be forwarded or not.
+	 */
+	const int authenticate_to_ftress = 
+		authenticate_ftress_indirect_primary_device(instance, request);
+
+	/* TODO: translate ftress error to RADIUS response
+	 * translate ftress error code (authenticate_to_ftress) to a RADIUS return 
+	 * code.  
+	 */
+	
+	if (RLM_MODULE_OK == authenticate_to_ftress) {
+		/* successful athentication to 4tress server, we are done */
+		return RLM_MODULE_OK;
+	}
+
+	/* we get pass this point *ONLY* if the authentication to 4tress server failed */
+
+	/* first check if authentication forwarding mode is on */
+	if (!data->conf_forward_authentication_mode) {
+		/* authentication forwarding is off, not much to do */
+		return RLM_MODULE_REJECT;
+	}
+
+	/* now, be explicit about in what situation we want to forward authentication request to a 3rd party server */
+	if (FTRESS_ERROR_AUTHENTICATE_BAD_OTP == authenticate_to_ftress) {
+		radlog(L_AUTH, "rlm_ftress: forwarding RADIUS authentication request to %s:%d",
+		       data->conf_forward_authentication_server,
+		       data->conf_forward_authentication_port);
+		
+		const int forwarding_response =
+			forward_authentication_request(instance, request);
+
+		if (forwarding_response) {
+			/* the 3rd party RADIUS server responded OK */
+			ftress_reset_failed_authentication_count(instance, request);
+			return RLM_MODULE_OK;
+		}
+
+	}
+
+	/* NOTHING TO DO, BECAUSE ONE OF THE FOLLOWING IS TRUE: 
+	 * - authentication to ftress server was successful (won't even get here)
+	 * - ftress responded 'error bad pin' (otp was right but pin was wrong)
+	 * - ftress responded 'error user not found'
+	 * - ftress responded 'error failure count reached'
+
+	 draft:
+	 FTRESS_ERROR_AUTHENTICATE_BAD_PIN
+	 FTRESS_ERROR_AUTHENTICATE_BAD_OTP
+	 FTRESS_ERROR_AUTHENTICATE_DEVICE_LOCKED
+	 FTRESS_ERROR_AUTHENTICATE_DEVICE_NOT_FOUND
+	 FTRESS_ERROR_AUTHENTICATE_USER_NOT_FOUND
+	*/
+
+	return RLM_MODULE_REJECT;
 }
 
 static int rlm_ftress_detach(void *instance)
