@@ -107,8 +107,8 @@ static CONF_PARSER module_config[] = {
 	{ "radius_username_mapping",         PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_radius_username_mapping),         NULL, 0   }, /* 0=default */
 	
 	{ "forward_authentication_mode",     PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, conf_forward_authentication_mode),     NULL, "no"}, /* no=default */
-	{ "forward_authentication_server",   PW_TYPE_IPADDR,     offsetof(rlm_ftress_t, conf_forward_authentication_server),   NULL, 0},
-	{ "forward_authentication_port",     PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_forward_authentication_port),     NULL, 0},
+	{ "forward_authentication_server",   PW_TYPE_IPADDR,     offsetof(rlm_ftress_t, conf_forward_authentication_server),   NULL, "*"},
+	{ "forward_authentication_port",     PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_forward_authentication_port),     NULL, 1812}, /* default RADIUS port */
 
 	{ NULL, -1, 0, NULL, NULL}
 };
@@ -408,18 +408,8 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 
 	DeviceSearchCriteria device_search_criteria = NULL;
 	UserCode user_code = NULL;
-
-	radlog(L_AUTH,
-	       "rlm_ftress: device_search_criteria = %u, user_code = %u",
-	       device_search_criteria,
-	       user_code);
 		
 	create_search_criteria(username, &user_code, &device_search_criteria);
-
-	radlog(L_AUTH,
-	       "rlm_ftress: device_search_criteria = %u, user_code = %u",
-	       device_search_criteria,
-	       user_code);
 
 	DeviceAuthenticationRequest req =
 		ftress_device_authentication_request_create(NULL,
@@ -445,7 +435,11 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 							    config->security_domain,
 							    resp);
 
-	if (FTRESS_SUCCESS == error_code) {
+	radlog(L_AUTH, "rlm_ftress: ftress_indirect_primary_authenticate_device(): %d, (FTRESS_SUCCESS:%d)",
+	       error_code,
+	       FTRESS_SUCCESS);
+
+	if (FTRESS_SUCCESS == error_code) { /* this means just succesfull communication with 4tress server */
 		AuthenticationResponse auth_resp =
 			ftress_primary_authenticate_device_get_authentication_response(resp);
 
@@ -453,7 +447,12 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 			(NULL != ftress_authentication_response_get_alsi(auth_resp))
 			? RLM_MODULE_OK : RLM_MODULE_REJECT;
 
+		if (RLM_MODULE_OK != authentication_result) {
+			radlog(L_AUTH, "rlm_ftress: 4TRESS authentication FAILED!!!"); 
+		}
+
 		/* TODO: ? check on who is freeing AuthenticationResponse */
+
 	} else {
 		/* TODO: ftress_exception_handler is not exposed in ftress.h */
 		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR: %s", 
@@ -464,7 +463,9 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 	ftress_device_authentication_request_free(req);
 	free_search_criteria(&user_code, &device_search_criteria);
 
-	radlog(L_AUTH, "rlm_ftress: ftress_authenticate(): %d", authentication_result);
+	radlog(L_AUTH, "rlm_ftress: ftress_authenticate(): %s",
+	       (authentication_result==RLM_MODULE_OK)?"RLM_MODULE_OK":"RLM_MODULE_REJECT" );
+
 	return authentication_result;
 }
 
@@ -498,8 +499,9 @@ static int ftress_reset_failed_authentication_count(void *instance, REQUEST *req
 	} else {
 		/* log error */
 	}
-
-	ftress_reset_device_authenticator_failed_authentication_count_response_free(resp);
+	
+	/* TODO: destructor missing! */
+	/* ftress_reset_device_authenticator_failed_authentication_count_response_free(resp); */
 	ftress_user_code_free(user_code);
 
 	return return_code;
@@ -520,7 +522,7 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 	 * translate ftress error code (authenticate_to_ftress) to a RADIUS return 
 	 * code.  
 	 */
-	
+
 	if (RLM_MODULE_OK == authenticate_to_ftress) {
 		/* successful athentication to 4tress server, we are done */
 		return RLM_MODULE_OK;
@@ -536,7 +538,7 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 
 	/* now, be explicit about in what situation we want to forward authentication request to a 3rd party server */
 	if (FTRESS_ERROR_AUTHENTICATE_BAD_OTP == authenticate_to_ftress) {
-		radlog(L_AUTH, "rlm_ftress: forwarding RADIUS authentication request to %s:%d",
+		radlog(L_AUTH, "rlm_ftress: forwarding RADIUS authentication request to %d:%d",
 		       data->conf_forward_authentication_server,
 		       data->conf_forward_authentication_port);
 		
