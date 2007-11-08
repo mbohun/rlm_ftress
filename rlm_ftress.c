@@ -130,6 +130,10 @@ static void set_active_authentication_type_code_username(struct rlm_ftress_t* da
 	data->active_authentication_type_code = data->user_authentication_type_code;
 }
 
+static void get_user_code_username(struct rlm_ftress_t* data, const char* username, UserCode* uc) {
+	*uc = ftress_user_code_create(username);
+}
+
 /* 'DEVICE_SERIAL_NUMBER' mode implementation */
 static void create_search_criteria_device_sn(const char* username, 
 					     UserCode* uc, 
@@ -160,6 +164,52 @@ static void set_active_authentication_type_code_device_sn(struct rlm_ftress_t* d
 	
 }
 
+static void get_user_code_device_sn(struct rlm_ftress_t* data, const char* device_serial_number, UserCode* uc) {
+	DeviceSearchCriteria dsc =
+		ftress_device_search_criteria_create(1, //searchLimit,
+						     0, //assignedToUser, - logically must be assigned
+						     NULL,
+						     NULL,//deviceId, 
+						     NULL,//deviceTypeCode,
+						     NULL,
+						     NULL,
+						     0,//issueNumber,
+						     device_serial_number,//serialNumber,
+						     NULL,
+						     NULL);
+	
+	SearchDevicesResponse resp =
+		ftress_search_devices_response_create();
+
+	const int ftress_result = ftress_search_devices(data->conf_endpoint_device_manager,
+							data->module_alsi,
+							data->server_channel_code,
+							dsc,
+							data->security_domain,
+							resp);
+
+	if (FTRESS_SUCCESS == ftress_result) {
+		DeviceSearchResults dsr = 
+			ftress_search_devices_response_get_device_search_results(resp);
+
+		radlog(L_AUTH, "rlm_ftress: ftress_device_search_results_get_matched_criteria():%d",
+		       ftress_device_search_results_get_matched_criteria(dsr));
+
+		*uc = ftress_device_search_results_get_user_code(dsr);
+
+		//*uc = ftress_user_code_create("martin"); /* TODO: do the real thing */
+
+		/*TODO: who is freeing DeviceSearchResults? */
+	} else {
+		/* log this */
+		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR:%s",
+		       ftress_exception_handler(ftress_result));
+	}
+	
+	ftress_device_search_criteria_free(dsc);
+
+}
+
 /* every mode needs to be registered in this RADIUS_USERNAME_MAPPING_TABLE */
 /* TODO: suggestion we can add 'description' string to the mode struct as well */
 static struct {
@@ -168,23 +218,27 @@ static struct {
 	void (*create_search_criteria) (const char* username, UserCode* uc, DeviceSearchCriteria* dsc);
 	void (*free_search_criteria) (UserCode* uc, DeviceSearchCriteria* dsc);
 	void (*set_active_authentication_type_code)(struct rlm_ftress_t* instance);
+	void (*get_user_code)(struct rlm_ftress_t* data, const char* username_or_dev_sn, UserCode* uc);
 } RADIUS_USERNAME_MAPPING_TABLE[] = {
 	/* default: USERNAME mode */
 	{  
 		0, "USERNAME",
 		create_search_criteria_username,
 		free_search_criteria_username, 
-		set_active_authentication_type_code_username
+		set_active_authentication_type_code_username,
+		get_user_code_username
 	},
 	/* DEVICE_SERIAL_NUMBER mode */
 	{  
 		1, "DEVICE_SERIAL_NUMBER",
 		create_search_criteria_device_sn, 
 		free_search_criteria_device_sn,
-		set_active_authentication_type_code_device_sn
+		set_active_authentication_type_code_device_sn,
+		get_user_code_device_sn
 	},
 	/* terminator - the table has to be terminated like this */
 	{ -1, NULL,
+	  NULL,
 	  NULL,
 	  NULL,
 	  NULL
@@ -220,6 +274,7 @@ static void display_radius_username_mapping_info() {
  */
 static void (*create_search_criteria) (const char* username, UserCode* uc, DeviceSearchCriteria* dsc);
 static void (*free_search_criteria) (UserCode* uc, DeviceSearchCriteria* dsc);
+static void (*get_user_code)(struct rlm_ftress_t* data, const char* username, UserCode* uc);
 
 static void set_radius_username_mapping_mode(struct rlm_ftress_t* data) {
 	int i = 0;
@@ -232,6 +287,10 @@ static void set_radius_username_mapping_mode(struct rlm_ftress_t* data) {
 
 			RADIUS_USERNAME_MAPPING_TABLE[i].set_active_authentication_type_code(data);
 
+			get_user_code =
+				RADIUS_USERNAME_MAPPING_TABLE[i].get_user_code;
+				
+			
 			return; /* success */
 			
 		}
@@ -477,8 +536,16 @@ static int ftress_reset_failed_authentication_count(void *instance, REQUEST *req
 	const struct rlm_ftress_t* data = instance;
 
 	/* TODO: add support for device serial numbers here */
+	/* can be both username OR device serial number*/
 	const char* username = (char*)request->username->strvalue;
-	UserCode user_code = ftress_user_code_create(username);
+	UserCode user_code = NULL;
+	get_user_code(data, username, &user_code);
+
+	if (NULL==user_code) {
+		/* failed to create user code, most likely because 
+		   the device serial number to username lookup failed */
+		return 0;
+	}
 
 	ResetDeviceAuthenticatorFailedAuthenticationCountResponse resp =
 		ftress_reset_device_authenticator_failed_authentication_count_response_create();
