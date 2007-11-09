@@ -571,6 +571,8 @@ static int ftress_reset_failed_authentication_count(void *instance, REQUEST *req
 	if (NULL==user_code) {
 		/* failed to create user code, most likely because 
 		   the device serial number to username lookup failed */
+		radlog(L_AUTH, "rlm_ftress: ERROR: user (for device serial number:%s) not found! - can not reset 4TRESS failed authentication counter!",
+		       username);
 		return 0;
 	}
 
