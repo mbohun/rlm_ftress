@@ -1,14 +1,15 @@
 PREREQUIREMENTS
-FreeRADIUS source
-QuickStartAPI (libftress.h and libftress.a (or libftress.so))
+   FreeRADIUS source
+   QuickStartAPI (libftress.h and libftress.a (or libftress.so))
 
 
 BUILDING
+   add 'rlm_ftress' to the end of $(FREERADIUS_ROOT)/src/modules/stable
 
-add 'rlm_ftress' to the end of $(FREERADIUS_ROOT)/src/modules/stable
+   run configure in $(FREERADIUS_ROOT)
+      ./configure --prefix=/usr/local/freeradius \
+                  --with-rlm-ftress-include-dir=../QuickStartAPI/Products/headers \
+                  --with-rlm-ftress-lib-dir=../QuickStartAPI/Products/lib
 
-run configure in $(FREERADIUS_ROOT)
-./configure --prefix=/usr/local/freeradius --enable-debug --with-rlm-ftress-include-dir=../QuickStartAPI/Products/headers --with-rlm-ftress-lib-dir=../QuickStartAPI/Products/lib
-
-make
-make install
+   make
+   make install
