@@ -31,6 +31,7 @@
 
 #include "ftress.h"
 
+
 /* TODO: request proper error codes */
 #define FTRESS_ERROR_AUTHENTICATE_BAD_OTP RLM_MODULE_REJECT
 
@@ -552,12 +553,7 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 	return authentication_result;
 }
 
-static int forward_authentication_request(void *instance, REQUEST *request) {
-	
-	
-
-	return 1;
-}
+static int forward_authentication_request(int ip, int port, char* username, char* password, char* secret);
 
 static int ftress_reset_failed_authentication_count(void *instance, REQUEST *request) {
 	const struct rlm_ftress_t* data = instance;
@@ -639,7 +635,11 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 		       data->conf_forward_authentication_port);
 		
 		const int forwarding_response =
-			forward_authentication_request(instance, request);
+			forward_authentication_request(data->conf_forward_authentication_server,
+						       data->conf_forward_authentication_port,
+						       request->username->strvalue,
+						       request->password->strvalue,
+						       "testing123"); /* TODO: fix this */
 
 		if (forwarding_response) {
 			/* the 3rd party RADIUS server responded OK */
