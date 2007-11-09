@@ -195,6 +195,8 @@ static void get_user_code_device_sn(struct rlm_ftress_t* data, const char* devic
 		radlog(L_AUTH, "rlm_ftress: ftress_device_search_results_get_matched_criteria():%d",
 		       ftress_device_search_results_get_matched_criteria(dsr));
 
+		/* TODO: BUG: libftress.a is buggy the device details on a Device struct are all NULL :-) */
+
 		ArrayOfDevices aod = ftress_device_search_results_get_devices(dsr);
 
 		radlog(L_AUTH, "rlm_ftress: ftress_arrayof_devices_get_size():%d",
