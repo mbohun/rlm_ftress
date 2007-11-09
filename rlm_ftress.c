@@ -192,8 +192,18 @@ static void get_user_code_device_sn(struct rlm_ftress_t* data, const char* devic
 		DeviceSearchResults dsr = 
 			ftress_search_devices_response_get_device_search_results(resp);
 
+		const int number_of_results =
+			ftress_device_search_results_get_matched_criteria(dsr);
+			
 		radlog(L_AUTH, "rlm_ftress: ftress_device_search_results_get_matched_criteria():%d",
-		       ftress_device_search_results_get_matched_criteria(dsr));
+		       number_of_results);
+
+		if (number_of_results < 1) {
+			/* the lookup failed, not much we can do... */
+			/* TODO: who is freeing DeviceSearchResults? */
+			*uc = NULL;
+			return;
+		}
 
 		/* TODO: BUG: libftress.a is buggy the device details on a Device struct are all NULL :-) */
 
@@ -543,6 +553,9 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 }
 
 static int forward_authentication_request(void *instance, REQUEST *request) {
+	
+	
+
 	return 1;
 }
 
