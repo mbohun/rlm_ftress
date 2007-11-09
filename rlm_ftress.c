@@ -654,11 +654,11 @@ static int rlm_ftress_detach(void *instance)
 	const struct rlm_ftress_t* data = instance;
 
 	/* TODO: who is responsible for freeing module_alsi data->module_alsi ? */ 
-	ftress_free_channel_code(data->server_channel_code);
-	ftress_free_security_domain(data->security_domain);
-	ftress_free_authentication_type_code(data->admin_authentication_type_code);
-	ftress_free_channel_code(data->user_channel_code);
-	ftress_free_authentication_type_code(data->user_authentication_type_code);
+	ftress_channel_code_free(data->server_channel_code);
+	ftress_security_domain_free(data->security_domain);
+	ftress_authentication_type_code_free(data->admin_authentication_type_code);
+	ftress_channel_code_free(data->user_channel_code);
+	ftress_authentication_type_code_free(data->user_authentication_type_code);
 
 	/* ftress client cleanup */
 	ftress_quit();
