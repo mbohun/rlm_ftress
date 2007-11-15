@@ -81,7 +81,7 @@ typedef struct rlm_ftress_t {
  * 'conf_forward_authentication_mode = yes'
  */ 
 	int client_sock_fd;
-
+	struct sockaddr_in client_sock_addr;
 } rlm_ftress_t;
 
 
@@ -484,6 +484,20 @@ static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 			radlog(L_AUTH, "rlm_ftress: ERROR: failed to create a socket!");
 			return -1;
 		}
+
+		/* bind any port */
+		data->client_sock_addr.sin_family = AF_INET;
+		data->client_sock_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+		data->client_sock_addr.sin_port = htons(0);
+  
+		if (bind(data->client_sock_fd,
+			 (struct sockaddr *)&(data->client_sock_addr),
+			 sizeof(data->client_sock_addr)) < 0) {
+			//failed to create a socket
+			radlog(L_AUTH, "rlm_ftress: ERROR: failed to bind a port!");
+			return -1;	
+		}
+
 	}
 
 	*instance = data;
@@ -601,7 +615,9 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 	request->packet->dst_ipaddr = data->conf_forward_authentication_server;
 	request->packet->dst_port = data->conf_forward_authentication_port;
 
-	/* should we set new client IP and port? as well */
+	/* should we set new client IP and port as well ? */
+	request->packet->src_ipaddr = data->client_sock_addr.sin_addr.s_addr;
+	request->packet->src_port = data->client_sock_addr.sin_port;
 
 	memcpy(request->secret, 
 	       "testing123", //data->conf_forward_authentication_secret, 
