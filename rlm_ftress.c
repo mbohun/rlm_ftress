@@ -76,6 +76,12 @@ typedef struct rlm_ftress_t {
  */
 	AuthenticationTypeCode active_authentication_type_code;
 
+/* socket file descriptor for authentication forwarding
+ * it is created and used only when  
+ * 'conf_forward_authentication_mode = yes'
+ */ 
+	int client_sock_fd;
+
 } rlm_ftress_t;
 
 
@@ -468,6 +474,18 @@ static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 
 	set_radius_username_mapping_mode(data);
 
+	/* create client socket for receiving packets */
+	if (data->conf_forward_authentication_mode) {
+
+		data->client_sock_fd = -1;
+
+		if ((data->client_sock_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+			//failed to create a socket
+			radlog(L_AUTH, "rlm_ftress: ERROR: failed to create a socket!");
+			return -1;
+		}
+	}
+
 	*instance = data;
 	return 0; /* success */
 }
@@ -569,41 +587,37 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 static int forward_authentication_request(void *instance, REQUEST *request) {
 	const struct rlm_ftress_t* data = instance;
 
-	time_t now = time(NULL);
-
-	int sockfd = -1;
-	
-	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
-		//failed to create a socket
-		radlog(L_AUTH, "rlm_ftress: ERROR: failed to create a socket!");
-		return 0;
-	}
+	//time_t now = time(NULL);
 
 	fd_set set;
-
 	FD_ZERO(&set);
-	FD_SET(sockfd, &set);
+	FD_SET(data->client_sock_fd, &set);
 
 	struct timeval tv;
 	tv.tv_sec = 1;
 	tv.tv_usec = 0;
 
-	request->packet->sockfd = sockfd; //
+	request->packet->sockfd = data->client_sock_fd;
 	request->packet->dst_ipaddr = data->conf_forward_authentication_server;
 	request->packet->dst_port = data->conf_forward_authentication_port;
-	memcpy(request->secret, "testing123", sizeof(request->secret)); //fix this
+
+	/* should we set new client IP and port? as well */
+
+	memcpy(request->secret, 
+	       "testing123", //data->conf_forward_authentication_secret, 
+	       sizeof(request->secret)); //fix this
 
 	if (rad_send(request->packet, NULL, request->secret) < 0) {
 		radlog(L_AUTH, "rlm_ftress: ERROR: rad_send() failed!");
 		return 0;
 	}
 
-	if (select(sockfd + 1, &set, NULL, NULL, &tv) != 1) {
+	if (select(data->client_sock_fd + 1, &set, NULL, NULL, &tv) != 1) {
 		radlog(L_AUTH, "rlm_ftress: ERROR: received no packets!");
 		return 0;
 	}
 
-	RADIUS_PACKET* reply = rad_recv(sockfd);
+	RADIUS_PACKET* reply = rad_recv(data->client_sock_fd);
 
 	const int forward_reply = reply->code;
 
@@ -734,6 +748,11 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 static int rlm_ftress_detach(void *instance)
 {
 	const struct rlm_ftress_t* data = instance;
+
+	/* close the client socket */
+	if (data->conf_forward_authentication_mode) {
+		close(data->client_sock_fd);
+	}
 
 	/* TODO: who is responsible for freeing module_alsi data->module_alsi ? */ 
 	ftress_channel_code_free(data->server_channel_code);
