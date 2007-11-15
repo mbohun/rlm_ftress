@@ -28,7 +28,7 @@
 #include "radiusd.h"
 #include "modules.h"
 #include "conffile.h"
-
+#include <sys/socket.h>
 #include "ftress.h"
 
 
@@ -566,13 +566,56 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 	return authentication_result;
 }
 
-static int forward_authentication_request(int ip, 
-					  int port, 
-					  char* username, 
-					  char* password, 
-					  char* secret) {
+static int forward_authentication_request(void *instance, REQUEST *request) {
+	const struct rlm_ftress_t* data = instance;
 
-	return 1;
+	time_t now = time(NULL);
+
+	int sockfd = -1;
+	
+	if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+		//failed to create a socket
+		radlog(L_AUTH, "rlm_ftress: ERROR: failed to create a socket!");
+		return 0;
+	}
+
+	fd_set set;
+
+	FD_ZERO(&set);
+	FD_SET(sockfd, &set);
+
+	struct timeval tv;
+	tv.tv_sec = 1;
+	tv.tv_usec = 0;
+
+	request->packet->sockfd = sockfd; //
+	request->packet->dst_ipaddr = data->conf_forward_authentication_server;
+	request->packet->dst_port = data->conf_forward_authentication_port;
+	memcpy(request->secret, "testing123", sizeof(request->secret)); //fix this
+
+	if (rad_send(request->packet, NULL, request->secret) < 0) {
+		radlog(L_AUTH, "rlm_ftress: ERROR: rad_send() failed!");
+		return 0;
+	}
+
+	if (select(sockfd + 1, &set, NULL, NULL, &tv) != 1) {
+		radlog(L_AUTH, "rlm_ftress: ERROR: received no packets!");
+		return 0;
+	}
+
+	RADIUS_PACKET* reply = rad_recv(sockfd);
+
+	const int forward_reply = reply->code;
+
+	radlog(L_AUTH, "rlm_ftress: request->reply->code(after): %d",
+	       forward_reply);
+	
+	if (PW_AUTHENTICATION_ACK == forward_reply) {
+		return 1; /* success */
+	} else {
+		return 0; /* error */
+	}
+
 }
 
 static int ftress_reset_failed_authentication_count(void *instance, REQUEST *request) {
@@ -658,11 +701,10 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 		       data->conf_forward_authentication_port);
 		
 		const int forwarding_response =
-			forward_authentication_request(data->conf_forward_authentication_server,
-						       data->conf_forward_authentication_port,
-						       request->username->strvalue,
-						       request->password->strvalue,
-						       "testing123"); /* TODO: fix this */
+			forward_authentication_request(data, request);
+
+		radlog(L_AUTH, "rlm_ftress: forwarding_response: %d",
+		       forwarding_response);
 
 		if (forwarding_response) {
 			/* the 3rd party RADIUS server responded OK */
