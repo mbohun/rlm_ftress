@@ -165,7 +165,10 @@ static void set_active_authentication_type_code_device_sn(struct rlm_ftress_t* d
 	
 }
 
-static void get_user_code_device_sn(struct rlm_ftress_t* data, const char* device_serial_number, UserCode* uc) {
+static void get_user_code_device_sn(const struct rlm_ftress_t* data, 
+				    const char* device_serial_number, 
+				    UserCode* uc) {
+
 	DeviceSearchCriteria dsc =
 		ftress_device_search_criteria_create(1, //searchLimit,
 						     0, //assignedToUser, - logically must be assigned
@@ -178,16 +181,17 @@ static void get_user_code_device_sn(struct rlm_ftress_t* data, const char* devic
 						     device_serial_number,//serialNumber,
 						     NULL,
 						     NULL);
-	
+
 	SearchDevicesResponse resp =
 		ftress_search_devices_response_create();
 
-	const int ftress_result = ftress_search_devices(data->conf_endpoint_device_manager,
-							data->module_alsi,
-							data->server_channel_code,
-							dsc,
-							data->security_domain,
-							resp);
+	const int ftress_result = 
+		ftress_search_devices(data->conf_endpoint_device_manager,
+				      data->module_alsi,
+				      data->server_channel_code,
+				      dsc,
+				      data->security_domain,
+				      resp);
 
 	if (FTRESS_SUCCESS == ftress_result) {
 		DeviceSearchResults dsr = 
@@ -203,11 +207,14 @@ static void get_user_code_device_sn(struct rlm_ftress_t* data, const char* devic
 			/* the lookup failed, not much we can do... */
 			/* TODO: who is freeing DeviceSearchResults? */
 			*uc = NULL;
+			ftress_search_devices_response_free(resp);
+			ftress_device_search_criteria_free(dsc);
 			return;
 		}
 
-		/* TODO: BUG: libftress.a is buggy the device details on a Device struct are all NULL :-) */
-
+		/* TODO: BUG: libftress.a is buggy
+		 * the device details on a Device struct are all NULL :-) 
+		 */
 		ArrayOfDevices aod = ftress_device_search_results_get_devices(dsr);
 
 		radlog(L_AUTH, "rlm_ftress: ftress_arrayof_devices_get_size():%d",
@@ -215,24 +222,30 @@ static void get_user_code_device_sn(struct rlm_ftress_t* data, const char* devic
 
 		Device* devices = ftress_arrayof_devices_get_devices(aod);
 		Device d = devices[0];
-
-		radlog(L_AUTH, "rlm_ftress: device: ftress_device_get_serial_number():%s",
-		       ftress_device_get_serial_number(d));
-
+	     
+		/* TODO: make sure user_code we are getting here is a DEEP-COPY.
+		 *       *uc = ftress_user_code_dup(test);
+		 *
+		 * For now we do it ourselves manually:
+		 */
 		UserCode test = ftress_device_get_user_code(d);
-		
+		const char* user_code_str = ftress_user_code_get_code(test);
+		const char* user_code_str_dup = strdup(user_code_str);
+		*uc = ftress_user_code_create(user_code_str);
+
 		radlog(L_AUTH, "rlm_ftress: device: %s is assigned to user: %s",
-		       device_serial_number, ftress_user_code_get_code(test));
+		       device_serial_number, user_code_str);
 
 		/*TODO: who is freeing DeviceSearchResults? */
+		
 	} else {
 		/* log this */
 		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR:%s",
 		       ftress_exception_handler(ftress_result));
 	}
-	
-	ftress_device_search_criteria_free(dsc);
 
+	ftress_search_devices_response_free(resp);
+	ftress_device_search_criteria_free(dsc);
 }
 
 /* every mode needs to be registered in this RADIUS_USERNAME_MAPPING_TABLE */
