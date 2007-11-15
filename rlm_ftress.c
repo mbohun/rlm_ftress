@@ -577,12 +577,12 @@ static int ftress_reset_failed_authentication_count(void *instance, REQUEST *req
 	UserCode user_code = NULL;
 	get_user_code(data, username, &user_code);
 
-	if (NULL==user_code) {
+	if (NULL == user_code) {
 		/* failed to create user code, most likely because 
 		   the device serial number to username lookup failed */
 		radlog(L_AUTH, "rlm_ftress: ERROR: user (for device serial number:%s) not found! - can not reset 4TRESS failed authentication counter!",
 		       username);
-		return 0;
+		return 0; /* failure */
 	}
 
 	ResetDeviceAuthenticatorFailedAuthenticationCountResponse resp =
@@ -600,7 +600,7 @@ static int ftress_reset_failed_authentication_count(void *instance, REQUEST *req
 
 	if (FTRESS_SUCCESS == error_code) {
 		radlog(L_AUTH, "rlm_ftress: ");
-		return_code = 1;	
+		return_code = 1; /* success */	
 	} else {
 		/* log error */
 	}
@@ -633,7 +633,7 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 		return RLM_MODULE_OK;
 	}
 
-	/* we get pass this point *ONLY* if the authentication to 4tress server failed */
+/* 8>< --- we get pass this point *ONLY* if the authentication to 4tress server failed --- ><8 */
 
 	/* first check if authentication forwarding mode is on */
 	if (!data->conf_forward_authentication_mode) {
