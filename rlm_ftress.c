@@ -566,7 +566,14 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 	return authentication_result;
 }
 
-static int forward_authentication_request(int ip, int port, char* username, char* password, char* secret);
+static int forward_authentication_request(int ip, 
+					  int port, 
+					  char* username, 
+					  char* password, 
+					  char* secret) {
+
+	return 1;
+}
 
 static int ftress_reset_failed_authentication_count(void *instance, REQUEST *request) {
 	const struct rlm_ftress_t* data = instance;
@@ -607,7 +614,10 @@ static int ftress_reset_failed_authentication_count(void *instance, REQUEST *req
 	
 	/* TODO: destructor missing! */
 	/* ftress_reset_device_authenticator_failed_authentication_count_response_free(resp); */
-	ftress_user_code_free(user_code);
+	
+	// TODO: do this properly in the QuickStartAPI
+	free(ftress_user_code_get_code(user_code)); //free the string first ...
+	ftress_user_code_free(user_code); //then free the struct
 
 	return return_code;
 }
