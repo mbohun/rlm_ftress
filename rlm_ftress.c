@@ -630,12 +630,12 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 		radlog(L_AUTH, "rlm_ftress: ERROR: rad_send() failed!");
 		return 0;
 	}
-
+/* TODO: fix the timeout
 	if (select(data->client_sock_fd + 1, &set, NULL, NULL, &tv) != 1) {
 		radlog(L_AUTH, "rlm_ftress: ERROR: received no packets!");
 		return 0;
 	}
-
+*/
 	RADIUS_PACKET* reply = rad_recv(data->client_sock_fd);
 
 	const int forward_reply = reply->code;
