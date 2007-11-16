@@ -58,6 +58,7 @@ typedef struct rlm_ftress_t {
 	int conf_forward_authentication_mode;
 	uint32_t conf_forward_authentication_server;
 	int conf_forward_authentication_port;
+	char* conf_forward_authentication_secret;
 
 /* 'global' variables, we constructed programatically */
 	Alsi* module_alsi;
@@ -116,6 +117,7 @@ static CONF_PARSER module_config[] = {
 	{ "forward_authentication_mode",     PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, conf_forward_authentication_mode),     NULL, "no"}, /* no=default */
 	{ "forward_authentication_server",   PW_TYPE_IPADDR,     offsetof(rlm_ftress_t, conf_forward_authentication_server),   NULL, "*"},
 	{ "forward_authentication_port",     PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_forward_authentication_port),     NULL, 1812}, /* default RADIUS port */
+	{ "forward_authentication_secret",   PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_forward_authentication_secret),   NULL, NULL},
 
 	{ NULL, -1, 0, NULL, NULL}
 };
@@ -619,11 +621,12 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 	request->packet->src_ipaddr = data->client_sock_addr.sin_addr.s_addr;
 	request->packet->src_port = data->client_sock_addr.sin_port;
 
-	memcpy(request->secret, 
-	       "testing123", //data->conf_forward_authentication_secret, 
-	       sizeof(request->secret)); //fix this
-
-	if (rad_send(request->packet, NULL, request->secret) < 0) {
+	/* if they have provided a shared secret for forwarding */
+	const char* secret =
+		(NULL != data->conf_forward_authentication_secret) 
+		? data->conf_forward_authentication_secret : request->secret;
+	
+	if (rad_send(request->packet, NULL, secret) < 0) {
 		radlog(L_AUTH, "rlm_ftress: ERROR: rad_send() failed!");
 		return 0;
 	}
@@ -796,6 +799,8 @@ static int rlm_ftress_detach(void *instance)
 	free(data->conf_endpoint_authenticator);
 	free(data->conf_endpoint_authenticator_manager);
 	free(data->conf_endpoint_device_manager);
+
+	free(data->conf_forward_authentication_secret);
 
 	free(data);
 	return 0;
