@@ -31,7 +31,6 @@
 #include <sys/socket.h>
 #include "ftress.h"
 
-
 /* TODO: request proper error codes */
 #define FTRESS_ERROR_AUTHENTICATE_BAD_OTP RLM_MODULE_REJECT
 
