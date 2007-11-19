@@ -102,7 +102,6 @@ typedef struct rlm_ftress_t {
 	struct sockaddr_in client_sock_addr;
 } rlm_ftress_t;
 
-
 /*
  *	A mapping of configuration file names to internal variables.
  *
