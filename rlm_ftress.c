@@ -156,7 +156,8 @@ static void set_active_authentication_type_code_username(struct rlm_ftress_t* da
 }
 
 static void get_user_code_username(struct rlm_ftress_t* data, const char* username, UserCode* uc) {
-	*uc = ftress_user_code_create(username);
+/* TODO: strdup() for now, till the mem management is not fixed in libftress.a */
+	*uc = ftress_user_code_create(strdup(username));
 }
 
 /* 'DEVICE_SERIAL_NUMBER' mode implementation */
