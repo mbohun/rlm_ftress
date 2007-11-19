@@ -54,6 +54,8 @@ void ftress_alsi_dup_free(const Alsi alsi) {
 
 typedef struct rlm_ftress_t {
 /* these are the variables we read from the configuration file, they are prefixed with conf_ */
+	int conf_use_ssl;
+
 	char* conf_admin_authentication_type_code;
 
 	char* conf_server_authentication_type_code;
@@ -112,6 +114,8 @@ typedef struct rlm_ftress_t {
  *	buffer over-flows.
  */
 static CONF_PARSER module_config[] = {
+	{ "use_ssl",                         PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, conf_use_ssl),                         NULL, "no"}, /* no=default */
+
 	{ "admin_authentication_type_code",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_admin_authentication_type_code),  NULL, NULL},
 
 	{ "server_authentication_type_code", PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_server_authentication_type_code), NULL, NULL},
@@ -467,7 +471,11 @@ static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 	}
 
 	/** Initialise ftress */
-	ftress_init();
+	if (data->conf_use_ssl) {
+		ftress_init_ssl();
+	} else {
+		ftress_init();
+	}
 
 	/* this is supposed to populate data->module_alsi with a valid ALSI */
 	authenticate_module_to_ftress(data);
