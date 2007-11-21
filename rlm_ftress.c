@@ -642,13 +642,22 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 	tv.tv_sec = 1;
 	tv.tv_usec = 0;
 
-	request->packet->sockfd = data->client_sock_fd;
-	request->packet->dst_ipaddr = data->conf_forward_authentication_server;
-	request->packet->dst_port = data->conf_forward_authentication_port;
+	RADIUS_PACKET* baby = rad_alloc(TRUE);
+	if (NULL == baby) {
+		radlog(L_ERR|L_CONS, "no memory");
+		return 0;
+	}
+
+	baby->vps = paircopy(request->packet->vps);
+	baby->code = request->packet->code; //PW_AUTHENTICATION_REQUEST
+
+	baby->sockfd = data->client_sock_fd;
+	baby->dst_ipaddr = data->conf_forward_authentication_server;
+	baby->dst_port = data->conf_forward_authentication_port;
 
 	/* should we set new client IP and port as well ? */
-	request->packet->src_ipaddr = data->client_sock_addr.sin_addr.s_addr;
-	request->packet->src_port = data->client_sock_addr.sin_port;
+	baby->src_ipaddr = data->client_sock_addr.sin_addr.s_addr;
+	baby->src_port = data->client_sock_addr.sin_port;
 
 	/* if they have provided a shared secret for forwarding */
 	const char* secret =
@@ -657,16 +666,20 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 	
 	radlog(L_AUTH, "rlm_ftress: forwarding secret: %s", secret);
 
-	if (rad_send(request->packet, NULL, secret) < 0) {
+	if (rad_send(baby, NULL, secret) < 0) {
 		radlog(L_AUTH, "rlm_ftress: ERROR: rad_send() failed!");
 		return 0;
 	}
+
+	rad_free(&baby);
+
 /* TODO: fix the timeout
 	if (select(data->client_sock_fd + 1, &set, NULL, NULL, &tv) != 1) {
 		radlog(L_AUTH, "rlm_ftress: ERROR: received no packets!");
 		return 0;
 	}
 */
+
 	RADIUS_PACKET* reply = rad_recv(data->client_sock_fd);
 
 	const int forward_reply = reply->code;
