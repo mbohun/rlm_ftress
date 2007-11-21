@@ -31,10 +31,11 @@
 #include <sys/socket.h>
 #include "ftress.h"
 
-/* TODO: request proper error codes */
+/* TODO (libftress.a): request proper error codes */
 #define FTRESS_ERROR_AUTHENTICATE_BAD_OTP RLM_MODULE_REJECT
 
-/* TODO: move this to libftress.a */
+
+/* TODO (libftress.a): my Alsi copy ctor, move this to libftress.a */
 Alsi ftress_alsi_dup(const Alsi other) {
 	char* alsi_str = strdup(ftress_alsi_get_alsi(other));
 	time_t* t = malloc(sizeof(time_t));
@@ -50,6 +51,19 @@ void ftress_alsi_dup_free(const Alsi alsi) {
 	free(ftress_alsi_get_alsi(alsi));
 	free(ftress_alsi_get_time_stamp(alsi));
 	free(alsi);
+}
+
+UserCode ftress_user_code_copy(const UserCode other) {
+	UserCode uc = ftress_user_code_create_default();
+	char* uc_str = strdup(ftress_user_code_get_code(other)); /* what if the string is empty? */
+	ftress_user_code_set_code(uc, uc_str);
+	return uc;
+}
+
+/* TODO (libftress.a): this is only tmp solution */
+void ftress_user_code_copy_free(const UserCode uc) {
+	free(ftress_user_code_get_code(uc));
+	free(uc);
 }
 
 typedef struct rlm_ftress_t {
@@ -104,15 +118,6 @@ typedef struct rlm_ftress_t {
 	struct sockaddr_in client_sock_addr;
 } rlm_ftress_t;
 
-/*
- *	A mapping of configuration file names to internal variables.
- *
- *	Note that the string is dynamically allocated, so it MUST
- *	be freed.  When the configuration file parse re-reads the string,
- *	it free's the old one, and strdup's the new one, placing the pointer
- *	to the strdup'd string into 'config.string'.  This gets around
- *	buffer over-flows.
- */
 static CONF_PARSER module_config[] = {
 	{ "use_ssl",                         PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, conf_use_ssl),                         NULL, "no"}, /* no=default */
 
@@ -241,9 +246,6 @@ static void get_user_code_device_sn(const struct rlm_ftress_t* data,
 			return;
 		}
 
-		/* TODO: BUG: libftress.a is buggy
-		 * the device details on a Device struct are all NULL :-) 
-		 */
 		ArrayOfDevices aod = ftress_device_search_results_get_devices(dsr);
 
 		radlog(L_AUTH, "rlm_ftress: ftress_arrayof_devices_get_size():%d",
@@ -258,14 +260,14 @@ static void get_user_code_device_sn(const struct rlm_ftress_t* data,
 		 * For now we do it ourselves manually:
 		 */
 		UserCode test = ftress_device_get_user_code(d);
-		const char* user_code_str = ftress_user_code_get_code(test);
-		const char* user_code_str_dup = strdup(user_code_str);
-		*uc = ftress_user_code_create(user_code_str);
+		const char* uc_str = ftress_user_code_get_code(test);
+		const char* uc_str_dup = strdup(uc_str);
+		*uc = ftress_user_code_create(uc_str_dup);
 
 		radlog(L_AUTH, "rlm_ftress: device: %s is assigned to user: %s",
-		       device_serial_number, user_code_str);
+		       device_serial_number, ftress_user_code_get_code(*uc));
 
-		/*TODO: who is freeing DeviceSearchResults? */
+		/*TODO (libftress.a): who is freeing DeviceSearchResults? */
 		
 	} else {
 		/* log this */
@@ -653,6 +655,8 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 		(NULL != data->conf_forward_authentication_secret) 
 		? data->conf_forward_authentication_secret : request->secret;
 	
+	radlog(L_AUTH, "rlm_ftress: forwarding secret: %s", secret);
+
 	if (rad_send(request->packet, NULL, secret) < 0) {
 		radlog(L_AUTH, "rlm_ftress: ERROR: rad_send() failed!");
 		return 0;
@@ -715,10 +719,9 @@ static int ftress_reset_failed_authentication_count(void *instance, REQUEST *req
 		/* log error */
 	}
 	
-	/* TODO: destructor missing! */
-	/* ftress_reset_device_authenticator_failed_authentication_count_response_free(resp); */
+	/* TODO (libftress.a): ftress_reset_device_authenticator_failed_authentication_count_response_free(resp); */
 	
-	// TODO: do this properly in the QuickStartAPI
+	/* TODO (libftress.a): add UserCode copy constructor */
 	free(ftress_user_code_get_code(user_code)); //free the string first ...
 	ftress_user_code_free(user_code); //then free the struct
 
@@ -727,7 +730,6 @@ static int ftress_reset_failed_authentication_count(void *instance, REQUEST *req
 
 static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 
-	/* should we capture username here before forwarding the request to the 3rd party server? */
 	const struct rlm_ftress_t* data = instance;
 
 	/* at this stage we *NEED* ftress errors, as the different error codes are used to decide
@@ -735,11 +737,6 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 	 */
 	const int authenticate_to_ftress = 
 		authenticate_ftress_indirect_primary_device(instance, request);
-
-	/* TODO: translate ftress error to RADIUS response
-	 * translate ftress error code (authenticate_to_ftress) to a RADIUS return 
-	 * code.  
-	 */
 
 	if (RLM_MODULE_OK == authenticate_to_ftress) {
 		/* successful athentication to 4tress server, we are done */
@@ -756,9 +753,6 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 
 	/* now, be explicit about in what situation we want to forward authentication request to a 3rd party server */
 	if (FTRESS_ERROR_AUTHENTICATE_BAD_OTP == authenticate_to_ftress) {
-		radlog(L_AUTH, "rlm_ftress: forwarding RADIUS authentication request to %d:%d",
-		       data->conf_forward_authentication_server,
-		       data->conf_forward_authentication_port);
 		
 		const int forwarding_response =
 			forward_authentication_request(data, request);
@@ -773,20 +767,6 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 		}
 
 	}
-
-	/* NOTHING TO DO, BECAUSE ONE OF THE FOLLOWING IS TRUE: 
-	 * - authentication to ftress server was successful (won't even get here)
-	 * - ftress responded 'error bad pin' (otp was right but pin was wrong)
-	 * - ftress responded 'error user not found'
-	 * - ftress responded 'error failure count reached'
-
-	 draft:
-	 FTRESS_ERROR_AUTHENTICATE_BAD_PIN
-	 FTRESS_ERROR_AUTHENTICATE_BAD_OTP
-	 FTRESS_ERROR_AUTHENTICATE_DEVICE_LOCKED
-	 FTRESS_ERROR_AUTHENTICATE_DEVICE_NOT_FOUND
-	 FTRESS_ERROR_AUTHENTICATE_USER_NOT_FOUND
-	*/
 
 	return RLM_MODULE_REJECT;
 }
