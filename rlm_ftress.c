@@ -247,10 +247,6 @@ static void get_user_code_device_sn(const struct rlm_ftress_t* data,
 		}
 
 		ArrayOfDevices aod = ftress_device_search_results_get_devices(dsr);
-
-		radlog(L_AUTH, "rlm_ftress: ftress_arrayof_devices_get_size():%d",
-		       ftress_arrayof_devices_get_size(aod));
-
 		Device* devices = ftress_arrayof_devices_get_devices(aod);
 		Device d = devices[0];
 	     
@@ -358,10 +354,9 @@ static void set_radius_username_mapping_mode(struct rlm_ftress_t* data) {
 
 			get_user_code =
 				RADIUS_USERNAME_MAPPING_TABLE[i].get_user_code;
-				
-			
+
 			return; /* success */
-			
+
 		}
 		++i;
 	}
@@ -642,6 +637,7 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 	tv.tv_sec = 1;
 	tv.tv_usec = 0;
 
+	/* create new radius packet, and copy the values from the original */
 	RADIUS_PACKET* baby = rad_alloc(TRUE);
 	if (NULL == baby) {
 		radlog(L_ERR|L_CONS, "no memory");
@@ -659,12 +655,10 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 	baby->src_ipaddr = data->client_sock_addr.sin_addr.s_addr;
 	baby->src_port = data->client_sock_addr.sin_port;
 
-	/* if they have provided a shared secret for forwarding */
+	/* if they have provided different shared secret for forwarding */
 	const char* secret =
 		(NULL != data->conf_forward_authentication_secret) 
 		? data->conf_forward_authentication_secret : request->secret;
-	
-	radlog(L_AUTH, "rlm_ftress: forwarding secret: %s", secret);
 
 	if (rad_send(baby, NULL, secret) < 0) {
 		radlog(L_AUTH, "rlm_ftress: ERROR: rad_send() failed!");
