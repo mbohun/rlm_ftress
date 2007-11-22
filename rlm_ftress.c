@@ -468,11 +468,7 @@ static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 	}
 
 	/** Initialise ftress */
-	if (data->conf_use_ssl) {
-		ftress_init_ssl();
-	} else {
-		ftress_init();
-	}
+	data->conf_use_ssl ? ftress_init_ssl() : ftress_init();
 
 	/* this is supposed to populate data->module_alsi with a valid ALSI */
 	authenticate_module_to_ftress(data);
