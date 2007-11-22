@@ -119,7 +119,7 @@ typedef struct rlm_ftress_t {
 } rlm_ftress_t;
 
 static CONF_PARSER module_config[] = {
-	{ "use_ssl",                         PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, conf_use_ssl),                         NULL, "no"}, /* no=default */
+	{ "use_ssl",                         PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, conf_use_ssl),                         NULL, "yes"}, /* no=default */
 
 	{ "admin_authentication_type_code",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_admin_authentication_type_code),  NULL, NULL},
 
