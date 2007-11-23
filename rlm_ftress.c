@@ -481,12 +481,12 @@ static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 		}
 	} else {
 		radlog(L_AUTH, "rlm_ftress: module failed to authenticate to 4TRESS server.");
-		/* TODO: free alsi? */
+		/* TODO: free alsi? or is it freed in rlm_ftress_detach() */
 		return -1;
 	}
 
 	/* check this later */
-	data->user_channel_code = ftress_channel_code_create(data->conf_user_channel , 0);
+	data->user_channel_code = ftress_channel_code_create(data->conf_user_channel , 0); // 0? magic number
 
 	data->admin_authentication_type_code = 
 		ftress_authentication_type_code_create(data->conf_admin_authentication_type_code);
@@ -526,7 +526,6 @@ static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 	return 0; /* success */
 }
 
-/* TODO: clean this up, it is getting to long and messy */
 static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *request) {
 
 	const struct rlm_ftress_t* config = instance;
@@ -564,10 +563,10 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 
 	DeviceAuthenticationRequest req =
 		ftress_device_authentication_request_create(NULL,
-							    0,				/* TODO: authenticate no session - request proper constant */
+							    0, /* TODO (libftress.a): authenticate no session - request proper constant */
 							    config->active_authentication_type_code,
 							    NULL,
-							    1, 				/* TODO: SYNCHRONOUS - request proper constant in ftress.h */
+							    1, /* TODO (libftress.a): SYNCHRONOUS - request proper constant in ftress.h */
 							    NULL,
 							    device_search_criteria,
 							    password,
@@ -599,15 +598,20 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 			? RLM_MODULE_OK : RLM_MODULE_REJECT;
 
 		if (RLM_MODULE_OK != authentication_result) {
-			radlog(L_AUTH, "rlm_ftress: 4TRESS authentication FAILED!!!"); 
+			radlog(L_AUTH, "rlm_ftress: 4TRESS authentication FAILED!!! (message:%s, reason:%d, response:%d)",
+			       ftress_authentication_response_get_message(auth_resp),
+			       ftress_authentication_response_get_reason(auth_resp),
+			       ftress_authentication_response_get_response(auth_resp)); 
 		}
 
-		/* TODO: ? check on who is freeing AuthenticationResponse */
+		/* TODO (libftress.a): ? check on who is freeing AuthenticationResponse */
 
 	} else {
-		/* TODO: ftress_exception_handler is not exposed in ftress.h */
+		/* TODO (libftress.a): ftress_exception_handler is not exposed in ftress.h */
+		/* TODO (libftress.a): ftress_exception_handler() seems buggy,
+		   we are triggering FreeRADIUS "Entering process fault" */	
 		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR: %s", 
-		       ftress_exception_handler(error_code));	
+		       ftress_exception_handler(error_code));
 	}
 
 	ftress_indirect_primary_authenticate_device_response_free(resp);
