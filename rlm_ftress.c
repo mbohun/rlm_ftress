@@ -34,38 +34,6 @@
 /* TODO (libftress.a): request proper error codes */
 #define FTRESS_ERROR_AUTHENTICATE_BAD_OTP RLM_MODULE_REJECT
 
-
-/* TODO (libftress.a): my Alsi copy ctor, move this to libftress.a */
-Alsi ftress_alsi_dup(const Alsi other) {
-	char* alsi_str = strdup(ftress_alsi_get_alsi(other));
-	time_t* t = malloc(sizeof(time_t));
-	memcpy(t, ftress_alsi_get_time_stamp(other), sizeof(time_t));
-
-	Alsi this = ftress_alsi_create_default();
-	ftress_alsi_set_alsi(this, alsi_str);
-	ftress_alsi_set_time_stamp(this, t);
-	return this;
-}
-
-void ftress_alsi_dup_free(const Alsi alsi) {
-	free(ftress_alsi_get_alsi(alsi));
-	free(ftress_alsi_get_time_stamp(alsi));
-	free(alsi);
-}
-
-UserCode ftress_user_code_copy(const UserCode other) {
-	UserCode uc = ftress_user_code_create_default();
-	char* uc_str = strdup(ftress_user_code_get_code(other)); /* what if the string is empty? */
-	ftress_user_code_set_code(uc, uc_str);
-	return uc;
-}
-
-/* TODO (libftress.a): this is only tmp solution */
-void ftress_user_code_copy_free(const UserCode uc) {
-	free(ftress_user_code_get_code(uc));
-	free(uc);
-}
-
 typedef struct rlm_ftress_t {
 /* these are the variables we read from the configuration file, they are prefixed with conf_ */
 	int conf_use_ssl;
@@ -91,6 +59,10 @@ typedef struct rlm_ftress_t {
 	int conf_forward_authentication_mode;
 	uint32_t conf_forward_authentication_server;
 	int conf_forward_authentication_port;
+
+	int conf_forward_authentication_timeout;
+	int conf_forward_authentication_retries;
+
 	char* conf_forward_authentication_secret;
 
 /* 'global' variables, we constructed programatically */
@@ -142,6 +114,10 @@ static CONF_PARSER module_config[] = {
 	{ "forward_authentication_mode",     PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, conf_forward_authentication_mode),     NULL, "no"}, /* no=default */
 	{ "forward_authentication_server",   PW_TYPE_IPADDR,     offsetof(rlm_ftress_t, conf_forward_authentication_server),   NULL, "*"},
 	{ "forward_authentication_port",     PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_forward_authentication_port),     NULL, 1812}, /* default RADIUS port */
+
+	{ "forward_authentication_timeout",  PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_forward_authentication_timeout),  NULL, 10},
+	{ "forward_authentication_retries",  PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_forward_authentication_retries),  NULL, 3},
+
 	{ "forward_authentication_secret",   PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_forward_authentication_secret),   NULL, NULL},
 
 	{ NULL, -1, 0, NULL, NULL}
@@ -165,8 +141,7 @@ static void set_active_authentication_type_code_username(struct rlm_ftress_t* da
 }
 
 static void get_user_code_username(struct rlm_ftress_t* data, const char* username, UserCode* uc) {
-/* TODO: strdup() for now, till the mem management is not fixed in libftress.a */
-	*uc = ftress_user_code_create(strdup(username));
+	*uc = ftress_user_code_create(username);
 }
 
 /* 'DEVICE_SERIAL_NUMBER' mode implementation */
@@ -256,9 +231,7 @@ static void get_user_code_device_sn(const struct rlm_ftress_t* data,
 		 * For now we do it ourselves manually:
 		 */
 		UserCode test = ftress_device_get_user_code(d);
-		const char* uc_str = ftress_user_code_get_code(test);
-		const char* uc_str_dup = strdup(uc_str);
-		*uc = ftress_user_code_create(uc_str_dup);
+		*uc = ftress_user_code_copy(test);
 
 		radlog(L_AUTH, "rlm_ftress: device: %s is assigned to user: %s",
 		       device_serial_number, ftress_user_code_get_code(*uc));
@@ -419,7 +392,7 @@ static int authenticate_module_to_ftress(void* instance) {
 		
 		/** Extract alsi from AuthenticationResponse */
 		const Alsi alsi = ftress_authentication_response_get_alsi(auth_res);
-		config->module_alsi = ftress_alsi_dup(alsi);
+		config->module_alsi = ftress_alsi_copy(alsi);
 
 		/** TODO: free auth_res ? **/
 	}
@@ -726,12 +699,8 @@ static int ftress_reset_failed_authentication_count(void *instance, REQUEST *req
 		/* log error */
 	}
 	
-	/* TODO (libftress.a): ftress_reset_device_authenticator_failed_authentication_count_response_free(resp); */
-	
-	/* TODO (libftress.a): add UserCode copy constructor */
-	free(ftress_user_code_get_code(user_code)); //free the string first ...
-	ftress_user_code_free(user_code); //then free the struct
-
+	ftress_reset_device_authenticator_failed_authentication_count_response_free(resp);
+	ftress_user_code_free(user_code);
 	return return_code;
 }
 
@@ -788,7 +757,7 @@ static int rlm_ftress_detach(void *instance)
 	}
 
 	/* TODO: who is responsible for freeing module_alsi data->module_alsi ? */
-	ftress_alsi_dup_free(data->module_alsi);
+	ftress_alsi_free(data->module_alsi);
 
 	ftress_channel_code_free(data->server_channel_code);
 	ftress_security_domain_free(data->security_domain);
