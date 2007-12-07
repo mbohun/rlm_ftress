@@ -602,14 +602,6 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 
 	//time_t now = time(NULL);
 
-	fd_set set;
-	FD_ZERO(&set);
-	FD_SET(data->client_sock_fd, &set);
-
-	struct timeval tv;
-	tv.tv_sec = 1;
-	tv.tv_usec = 0;
-
 	/* create new radius packet, and copy the values from the original */
 	RADIUS_PACKET* baby = rad_alloc(TRUE);
 	if (NULL == baby) {
@@ -638,14 +630,22 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 		return 0;
 	}
 
-	rad_free(&baby);
+	fd_set set;
+	FD_ZERO(&set);
+	FD_SET(baby->sockfd, &set);
 
-/* TODO: fix the timeout
-	if (select(data->client_sock_fd + 1, &set, NULL, NULL, &tv) != 1) {
-		radlog(L_AUTH, "rlm_ftress: ERROR: received no packets!");
+	struct timeval tv;
+	tv.tv_sec = data->conf_forward_authentication_timeout;
+	tv.tv_usec = 0;
+
+/* TODO: fix (the number of) retries */
+	if (select(baby->sockfd + 1, &set, NULL, NULL, &tv) != 1) {
+		radlog(L_AUTH, "rlm_ftress: ERROR: received no packets (timeout)!");
+		rad_free(&baby);
 		return 0;
 	}
-*/
+
+	rad_free(&baby);
 
 	RADIUS_PACKET* reply = rad_recv(data->client_sock_fd);
 
