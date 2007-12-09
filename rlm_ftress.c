@@ -224,22 +224,19 @@ static void get_user_code_device_sn(const struct rlm_ftress_t* data,
 		ArrayOfDevices aod = ftress_device_search_results_get_devices(dsr);
 		Device* devices = ftress_arrayof_devices_get_devices(aod);
 		Device d = devices[0];
-	     
-		/* TODO: make sure user_code we are getting here is a DEEP-COPY.
-		 *       *uc = ftress_user_code_dup(test);
-		 *
-		 * For now we do it ourselves manually:
-		 */
+
 		UserCode test = ftress_device_get_user_code(d);
 		*uc = ftress_user_code_copy(test);
 
 		radlog(L_AUTH, "rlm_ftress: device: %s is assigned to user: %s",
 		       device_serial_number, ftress_user_code_get_code(*uc));
-
-		/*TODO (libftress.a): who is freeing DeviceSearchResults? */
 		
 	} else {
-		/* log this */
+		/* log error */
+		/* TODO (libftress.a): ftress_exception_handler() looks buggy */
+		/* update - it is not a bug, "Entering process fault" comes from libftress.a, because
+		 the devs did simple logging with printf directly to stdin, where it got mixed with
+		 freeradius debug messages */
 		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR:%s",
 		       ftress_exception_handler(ftress_result));
 	}
@@ -580,7 +577,6 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 		/* TODO (libftress.a): ? check on who is freeing AuthenticationResponse */
 
 	} else {
-		/* TODO (libftress.a): ftress_exception_handler is not exposed in ftress.h */
 		/* TODO (libftress.a): ftress_exception_handler() seems buggy,
 		   we are triggering FreeRADIUS "Entering process fault" */	
 		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR: %s", 
