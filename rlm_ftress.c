@@ -676,6 +676,9 @@ static int ftress_reset_failed_authentication_count(void *instance, REQUEST *req
 	ResetDeviceAuthenticatorFailedAuthenticationCountResponse resp =
 		ftress_reset_device_authenticator_failed_authentication_count_response_create();
 
+	radlog(L_AUTH, "rlm_ftress: attempting to reset 4TRESS failed authentication count for username: %s",
+	       ftress_user_code_get_code(user_code));
+
 	const int error_code =
 		ftress_reset_device_authenticator_failed_authentication_count(data->conf_endpoint_authenticator_manager,
 									      data->module_alsi,
@@ -687,10 +690,11 @@ static int ftress_reset_failed_authentication_count(void *instance, REQUEST *req
 	int return_code = 0; /* failure */
 
 	if (FTRESS_SUCCESS == error_code) {
-		radlog(L_AUTH, "rlm_ftress: ");
 		return_code = 1; /* success */	
 	} else {
 		/* log error */
+		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR: reset 4TRESS failed authentication counter failed! (reason: %s)", 
+		       ftress_exception_handler(error_code));
 	}
 	
 	ftress_reset_device_authenticator_failed_authentication_count_response_free(resp);
