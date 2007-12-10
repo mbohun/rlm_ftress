@@ -626,34 +626,20 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 		return 0;
 	}
 
-	int success = 0;
-	int retries = 0;
-	for (retries = 0; retries < data->conf_forward_authentication_retries; ++retries) {
-		radlog(L_AUTH, "rlm_ftress: forwarding authentication request (connection attempt: %d)",
-		       retries);
+	fd_set set;
+	FD_ZERO(&set);
+	FD_SET(baby->sockfd, &set);
 
-		fd_set set;
-		FD_ZERO(&set);
-		FD_SET(baby->sockfd, &set);
+	struct timeval tv;
+	tv.tv_sec = data->conf_forward_authentication_timeout;
+	tv.tv_usec = 0;
 
-		struct timeval tv;
-		tv.tv_sec = data->conf_forward_authentication_timeout;
-		tv.tv_usec = 0;
-
-		if (select(baby->sockfd + 1, &set, NULL, NULL, &tv) != 1) {
-			continue;
-		} else {
-			success = 1;
-			break;
-		}
+	if (select(baby->sockfd + 1, &set, NULL, NULL, &tv) != 1) {
+		rad_free(&baby);
+		return 0;
 	}
 
 	rad_free(&baby);
-
-	if (!success) {
-		radlog(L_AUTH, "rlm_ftress: ERROR: forwarding authentication request failed! (received no packets from the 3rd party RADIUS server)!");
-		return 0;
-	}
 
 	RADIUS_PACKET* reply = rad_recv(data->client_sock_fd);
 
@@ -738,11 +724,24 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 	/* now, be explicit about in what situation we want to forward authentication request to a 3rd party server */
 	if (FTRESS_ERROR_AUTHENTICATE_BAD_OTP == authenticate_to_ftress) {
 		
-		const int forwarding_response =
-			forward_authentication_request(data, request);
+		int forwarding_response = 0; /* default to failure */
 
-		radlog(L_AUTH, "rlm_ftress: forwarding_response: %d",
-		       forwarding_response);
+		int retries = 0;
+		for (retries = 0; retries < data->conf_forward_authentication_retries; ++retries) {
+			radlog(L_AUTH, "rlm_ftress: forwarding authentication request (connection attempt: %d)",
+			       retries);			
+
+			forwarding_response = 
+				forward_authentication_request(data, request);
+
+			radlog(L_AUTH, "rlm_ftress: forwarding_response: %d",
+			       forwarding_response);
+
+			if (forwarding_response) {
+				break;
+			}
+
+		}
 
 		if (forwarding_response) {
 			/* the 3rd party RADIUS server responded OK */
