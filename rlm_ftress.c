@@ -626,22 +626,34 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 		return 0;
 	}
 
-	fd_set set;
-	FD_ZERO(&set);
-	FD_SET(baby->sockfd, &set);
+	int success = 0;
+	int retries = 0;
+	for (retries = 0; retries < data->conf_forward_authentication_retries; ++retries) {
+		radlog(L_AUTH, "rlm_ftress: forwarding authentication request (connection attempt: %d)",
+		       retries);
 
-	struct timeval tv;
-	tv.tv_sec = data->conf_forward_authentication_timeout;
-	tv.tv_usec = 0;
+		fd_set set;
+		FD_ZERO(&set);
+		FD_SET(baby->sockfd, &set);
 
-/* TODO: fix (the number of) retries */
-	if (select(baby->sockfd + 1, &set, NULL, NULL, &tv) != 1) {
-		radlog(L_AUTH, "rlm_ftress: ERROR: received no packets (timeout)!");
-		rad_free(&baby);
-		return 0;
+		struct timeval tv;
+		tv.tv_sec = data->conf_forward_authentication_timeout;
+		tv.tv_usec = 0;
+
+		if (select(baby->sockfd + 1, &set, NULL, NULL, &tv) != 1) {
+			continue;
+		} else {
+			success = 1;
+			break;
+		}
 	}
 
 	rad_free(&baby);
+
+	if (!success) {
+		radlog(L_AUTH, "rlm_ftress: ERROR: forwarding authentication request failed! (received no packets from the 3rd party RADIUS server)!");
+		return 0;
+	}
 
 	RADIUS_PACKET* reply = rad_recv(data->client_sock_fd);
 
