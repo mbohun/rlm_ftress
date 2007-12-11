@@ -178,6 +178,8 @@ static void get_user_code_device_sn(const struct rlm_ftress_t* data,
 				    const char* device_serial_number, 
 				    UserCode* uc) {
 
+	*uc = NULL; /* default */
+
 	DeviceSearchCriteria dsc =
 		ftress_device_search_criteria_create(1, //searchLimit,
 						     0, //assignedToUser, - logically must be assigned
@@ -212,31 +214,16 @@ static void get_user_code_device_sn(const struct rlm_ftress_t* data,
 		radlog(L_AUTH, "rlm_ftress: ftress_device_search_results_get_matched_criteria():%d",
 		       number_of_results);
 
-		if (number_of_results < 1) {
-			/* the lookup failed, not much we can do... */
-			/* TODO: who is freeing DeviceSearchResults? */
-			*uc = NULL;
-			ftress_search_devices_response_free(resp);
-			ftress_device_search_criteria_free(dsc);
-			return;
+		if (number_of_results > 0) {
+			ArrayOfDevices aod = ftress_device_search_results_get_devices(dsr);
+			Device* devices = ftress_arrayof_devices_get_devices(aod);
+			Device d = devices[0];
+			UserCode test = ftress_device_get_user_code(d);
+			*uc = ftress_user_code_copy(test);
+			radlog(L_AUTH, "rlm_ftress: device: %s is assigned to user: %s",
+			       device_serial_number, ftress_user_code_get_code(*uc));
 		}
-
-		ArrayOfDevices aod = ftress_device_search_results_get_devices(dsr);
-		Device* devices = ftress_arrayof_devices_get_devices(aod);
-		Device d = devices[0];
-
-		UserCode test = ftress_device_get_user_code(d);
-		*uc = ftress_user_code_copy(test);
-
-		radlog(L_AUTH, "rlm_ftress: device: %s is assigned to user: %s",
-		       device_serial_number, ftress_user_code_get_code(*uc));
-		
 	} else {
-		/* log error */
-		/* TODO (libftress.a): ftress_exception_handler() looks buggy */
-		/* update - it is not a bug, "Entering process fault" comes from libftress.a, because
-		 the devs did simple logging with printf directly to stdin, where it got mixed with
-		 freeradius debug messages */
 		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR:%s",
 		       ftress_exception_handler(ftress_result));
 	}
@@ -332,8 +319,7 @@ static void set_radius_username_mapping_mode(struct rlm_ftress_t* data) {
 	}
 
 	/* we should never come here */
-	radlog(L_AUTH, 
-	       "rlm_ftress: ERROR: set_radius_username_mapping_mode() FAILED!");
+	radlog(L_AUTH, "rlm_ftress: ERROR: set_radius_username_mapping_mode() FAILED!");
 	
 }
 
@@ -345,22 +331,18 @@ static int authenticate_module_to_ftress(void* instance) {
 
 	struct rlm_ftress_t* config = instance;
 
-	/** Create ChannelCode*/
 	config->server_channel_code = 
 		ftress_channel_code_create(config->conf_server_channel, 0);
-	
-	/** Create SecurityDomain */
+
 	config->security_domain = 
 		ftress_security_domain_create(config->conf_security_domain);		
 
 	ftress_security_domain_set_domain(config->security_domain, 
 					  config->conf_security_domain); /* TODO: check if this is required */
 
-	/** Create AuthenticationTypeCode */
 	AuthenticationTypeCode server_authentication_type_code = 
 		ftress_authentication_type_code_create(config->conf_server_authentication_type_code);
 
-	/** Create UPAuthenticationRequest */
 	UPAuthenticationRequest req = 
 		ftress_up_authentication_request_create(NULL, 
 							0, 
@@ -371,7 +353,6 @@ static int authenticate_module_to_ftress(void* instance) {
 							NULL, 
 							config->conf_server_username);
 
-	/** Create PrimaryAuthenticateUPResponse */
 	PrimaryAuthenticateUPResponse resp = 
 		ftress_primary_authenticate_up_response_create();
 
@@ -383,21 +364,18 @@ static int authenticate_module_to_ftress(void* instance) {
 					       resp);
 
 	if (FTRESS_SUCCESS == error_code) {
-		/** Extract AuthenticationResponse from primaryAuthenticateUPResponse */
 		AuthenticationResponse auth_res =
 			ftress_primary_authenticate_up_get_authentication_response(resp);
 		
-		/** Extract alsi from AuthenticationResponse */
 		const Alsi alsi = ftress_authentication_response_get_alsi(auth_res);
 		config->module_alsi = ftress_alsi_copy(alsi);
-
-		/** TODO: free auth_res ? **/
+	} else {
+		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR: %s", ftress_exception_handler(error_code));
 	}
 	
 	ftress_primary_authenticate_up_response_free(resp);
 	ftress_up_authentication_request_free(req);
 	ftress_authentication_type_code_free(server_authentication_type_code);
-
 	return 0;
 }
 
@@ -489,7 +467,6 @@ static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 			radlog(L_AUTH, "rlm_ftress: ERROR: failed to bind a port!");
 			return -1;	
 		}
-
 	}
 
 	*instance = data;
@@ -528,7 +505,6 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 
 	DeviceSearchCriteria device_search_criteria = NULL;
 	UserCode user_code = NULL;
-		
 	create_search_criteria(username, &user_code, &device_search_criteria);
 
 	DeviceAuthenticationRequest req =
@@ -545,8 +521,6 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 	IndirectPrimaryAuthenticateDeviceResponse resp =
 		ftress_indirect_primary_authenticate_device_response_create();
 
-	int authentication_result = RLM_MODULE_REJECT; /* default */
-
 	const int error_code = 
 		ftress_indirect_primary_authenticate_device(config->conf_endpoint_authenticator,
 							    config->module_alsi,
@@ -559,6 +533,7 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 	       error_code,
 	       FTRESS_SUCCESS);
 
+	int authentication_result = RLM_MODULE_REJECT; /* default */
 	if (FTRESS_SUCCESS == error_code) { /* this means just succesfull communication with 4tress server */
 		AuthenticationResponse auth_resp =
 			ftress_primary_authenticate_device_get_authentication_response(resp);
@@ -574,13 +549,8 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 			       ftress_authentication_response_get_response(auth_resp)); 
 		}
 
-		/* TODO (libftress.a): ? check on who is freeing AuthenticationResponse */
-
 	} else {
-		/* TODO (libftress.a): ftress_exception_handler() seems buggy,
-		   we are triggering FreeRADIUS "Entering process fault" */	
-		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR: %s", 
-		       ftress_exception_handler(error_code));
+		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR: %s", ftress_exception_handler(error_code));
 	}
 
 	ftress_indirect_primary_authenticate_device_response_free(resp);
@@ -596,23 +566,19 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 static int forward_authentication_request(void *instance, REQUEST *request) {
 	const struct rlm_ftress_t* data = instance;
 
-	//time_t now = time(NULL);
-
-	/* create new radius packet, and copy the values from the original */
+	/* create a new radius packet */
 	RADIUS_PACKET* baby = rad_alloc(TRUE);
 	if (NULL == baby) {
 		radlog(L_ERR|L_CONS, "no memory");
 		return 0;
 	}
 
+	/* and copy the values from the original */
 	baby->vps = paircopy(request->packet->vps);
 	baby->code = request->packet->code; //PW_AUTHENTICATION_REQUEST
-
 	baby->sockfd = data->client_sock_fd;
 	baby->dst_ipaddr = data->conf_forward_authentication_server;
 	baby->dst_port = data->conf_forward_authentication_port;
-
-	/* should we set new client IP and port as well ? */
 	baby->src_ipaddr = data->client_sock_addr.sin_addr.s_addr;
 	baby->src_port = data->client_sock_addr.sin_port;
 
@@ -642,42 +608,31 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 	rad_free(&baby);
 
 	RADIUS_PACKET* reply = rad_recv(data->client_sock_fd);
-
-	const int forward_reply = reply->code;
-
-	radlog(L_AUTH, "rlm_ftress: request->reply->code(after): %d",
-	       forward_reply);
-	
-	if (PW_AUTHENTICATION_ACK == forward_reply) {
-		return 1; /* success */
-	} else {
-		return 0; /* error */
-	}
+	radlog(L_AUTH, "rlm_ftress: request->reply->code(after): %d", reply->code);
+	return (PW_AUTHENTICATION_ACK == reply->code) ? 1 : 0;
 
 }
 
 static int ftress_reset_failed_authentication_count(void *instance, REQUEST *request) {
+
 	const struct rlm_ftress_t* data = instance;
 
-	/* TODO: add support for device serial numbers here */
-	/* can be both username OR device serial number*/
 	const char* username = (char*)request->username->strvalue;
 	UserCode user_code = NULL;
 	get_user_code(data, username, &user_code);
 
 	if (NULL == user_code) {
-		/* failed to create user code, most likely because 
-		   the device serial number to username lookup failed */
+		/* failed to create user code, most likely because the device serial number to username lookup failed */
 		radlog(L_AUTH, "rlm_ftress: ERROR: user (for device serial number:%s) not found! - can not reset 4TRESS failed authentication counter!",
 		       username);
 		return 0; /* failure */
 	}
 
-	ResetDeviceAuthenticatorFailedAuthenticationCountResponse resp =
-		ftress_reset_device_authenticator_failed_authentication_count_response_create();
-
 	radlog(L_AUTH, "rlm_ftress: attempting to reset 4TRESS failed authentication count for username: %s",
 	       ftress_user_code_get_code(user_code));
+
+	ResetDeviceAuthenticatorFailedAuthenticationCountResponse resp =
+		ftress_reset_device_authenticator_failed_authentication_count_response_create();
 
 	const int error_code =
 		ftress_reset_device_authenticator_failed_authentication_count(data->conf_endpoint_authenticator_manager,
@@ -687,28 +642,23 @@ static int ftress_reset_failed_authentication_count(void *instance, REQUEST *req
 									      data->admin_authentication_type_code,
 									      data->security_domain,
 									      resp);
-	int return_code = 0; /* failure */
 
-	if (FTRESS_SUCCESS == error_code) {
-		return_code = 1; /* success */	
-	} else {
-		/* log error */
-		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR: reset 4TRESS failed authentication counter failed! (reason: %s)", 
-		       ftress_exception_handler(error_code));
-	}
-	
 	ftress_reset_device_authenticator_failed_authentication_count_response_free(resp);
 	ftress_user_code_free(user_code);
-	return return_code;
+
+	if (FTRESS_SUCCESS != error_code) {
+		radlog(L_AUTH, "rlm_ftress: 4TRESS ERROR: reset 4TRESS failed authentication counter failed! (reason: %s)", 
+		       ftress_exception_handler(error_code));
+		return 0; /* failure */
+	}
+	
+	return 1; /* success */
 }
 
 static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 
 	const struct rlm_ftress_t* data = instance;
 
-	/* at this stage we *NEED* ftress errors, as the different error codes are used to decide
-	 * if the request needs to be forwarded or not.
-	 */
 	const int authenticate_to_ftress = 
 		authenticate_ftress_indirect_primary_device(instance, request);
 
@@ -718,7 +668,6 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 	}
 
 /* 8>< --- we get pass this point *ONLY* if the authentication to 4tress server failed --- ><8 */
-
 	/* first check if authentication forwarding mode is on */
 	if (!data->conf_forward_authentication_mode) {
 		/* authentication forwarding is off, not much to do */
@@ -727,9 +676,7 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 
 	/* now, be explicit about in what situation we want to forward authentication request to a 3rd party server */
 	if (FTRESS_ERROR_AUTHENTICATE_BAD_OTP == authenticate_to_ftress) {
-		
 		int forwarding_response = 0; /* default to failure */
-
 		int retries = 0;
 		for (retries = 0; retries < data->conf_forward_authentication_retries; ++retries) {
 			radlog(L_AUTH, "rlm_ftress: forwarding authentication request (connection attempt: %d)",
@@ -744,7 +691,6 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 			if (forwarding_response) {
 				break;
 			}
-
 		}
 
 		if (forwarding_response) {
@@ -752,7 +698,6 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 			ftress_reset_failed_authentication_count(instance, request);
 			return RLM_MODULE_OK;
 		}
-
 	}
 
 	return RLM_MODULE_REJECT;
