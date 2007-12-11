@@ -563,6 +563,11 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 	return authentication_result;
 }
 
+/*  return codes:
+ *     0 - timeout, connection problem, etc. anything that will cause retry
+ *     1 - authentication success
+ *     2 - authentication failure
+ */
 static int forward_authentication_request(void *instance, REQUEST *request) {
 	const struct rlm_ftress_t* data = instance;
 
@@ -602,14 +607,14 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 
 	if (select(baby->sockfd + 1, &set, NULL, NULL, &tv) != 1) {
 		rad_free(&baby);
-		return 0;
+		return 0; 
 	}
 
 	rad_free(&baby);
 
 	RADIUS_PACKET* reply = rad_recv(data->client_sock_fd);
 	radlog(L_AUTH, "rlm_ftress: request->reply->code(after): %d", reply->code);
-	return (PW_AUTHENTICATION_ACK == reply->code) ? 1 : 0;
+	return (PW_AUTHENTICATION_ACK == reply->code) ? 1 : 2;
 
 }
 
@@ -693,7 +698,7 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 			}
 		}
 
-		if (forwarding_response) {
+		if (1 == forwarding_response) {
 			/* the 3rd party RADIUS server responded OK */
 			ftress_reset_failed_authentication_count(instance, request);
 			return RLM_MODULE_OK;
