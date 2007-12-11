@@ -34,6 +34,10 @@
 /* TODO (libftress.a): request proper error codes */
 #define FTRESS_ERROR_AUTHENTICATE_BAD_OTP RLM_MODULE_REJECT
 
+#define RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM 0
+#define RLM_FTRESS_FORWARD_AUTHENTICATION_ACCEPT 1
+#define RLM_FTRESS_FORWARD_AUTHENTICATION_REJECT 2
+
 typedef struct rlm_ftress_t {
 /* these are the variables we read from the configuration file, they are prefixed with conf_ */
 	int conf_use_ssl;
@@ -564,9 +568,9 @@ static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *
 }
 
 /*  return codes:
- *     0 - timeout, connection problem, etc. anything that will cause retry
- *     1 - authentication success
- *     2 - authentication failure
+ *     RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM - timeout, connection problem, etc. anything that will cause retry
+ *     RLM_FTRESS_FORWARD_AUTHENTICATION_ACCEPT  - authentication success
+ *     RLM_FTRESS_FORWARD_AUTHENTICATION_REJECT  - authentication failure
  */
 static int forward_authentication_request(void *instance, REQUEST *request) {
 	const struct rlm_ftress_t* data = instance;
@@ -575,7 +579,7 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 	RADIUS_PACKET* baby = rad_alloc(TRUE);
 	if (NULL == baby) {
 		radlog(L_ERR|L_CONS, "no memory");
-		return 0;
+		return RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM;
 	}
 
 	/* and copy the values from the original */
@@ -594,7 +598,7 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 
 	if (rad_send(baby, NULL, secret) < 0) {
 		radlog(L_AUTH, "rlm_ftress: ERROR: rad_send() failed!");
-		return 0;
+		return RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM;
 	}
 
 	fd_set set;
@@ -607,14 +611,15 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 
 	if (select(baby->sockfd + 1, &set, NULL, NULL, &tv) != 1) {
 		rad_free(&baby);
-		return 0; 
+		return RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM; 
 	}
 
 	rad_free(&baby);
 
 	RADIUS_PACKET* reply = rad_recv(data->client_sock_fd);
 	radlog(L_AUTH, "rlm_ftress: request->reply->code(after): %d", reply->code);
-	return (PW_AUTHENTICATION_ACK == reply->code) ? 1 : 2;
+	return (PW_AUTHENTICATION_ACK == reply->code)
+		? RLM_FTRESS_FORWARD_AUTHENTICATION_ACCEPT : RLM_FTRESS_FORWARD_AUTHENTICATION_REJECT;
 
 }
 
@@ -693,12 +698,14 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 			radlog(L_AUTH, "rlm_ftress: forwarding_response: %d",
 			       forwarding_response);
 
-			if (forwarding_response) {
-				break;
+			if (RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM == forwarding_response) {
+				continue;
 			}
+
+			break; /* only RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM is retried */
 		}
 
-		if (1 == forwarding_response) {
+		if (RLM_FTRESS_FORWARD_AUTHENTICATION_ACCEPT == forwarding_response) {
 			/* the 3rd party RADIUS server responded OK */
 			ftress_reset_failed_authentication_count(instance, request);
 			return RLM_MODULE_OK;
