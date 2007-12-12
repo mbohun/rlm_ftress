@@ -113,14 +113,14 @@ static CONF_PARSER module_config[] = {
 	{ "endpoint_authenticator_manager",  PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_endpoint_authenticator_manager),  NULL, NULL},
 	{ "endpoint_device_manager",         PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_endpoint_device_manager),         NULL, NULL},
 
-	{ "radius_username_mapping",         PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_radius_username_mapping),         NULL, 0   }, /* 0=default */
+	{ "radius_username_mapping",         PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_radius_username_mapping),         NULL, "0"   }, /* 0=default */
 	
 	{ "forward_authentication_mode",     PW_TYPE_BOOLEAN,    offsetof(rlm_ftress_t, conf_forward_authentication_mode),     NULL, "no"}, /* no=default */
 	{ "forward_authentication_server",   PW_TYPE_IPADDR,     offsetof(rlm_ftress_t, conf_forward_authentication_server),   NULL, "*"},
-	{ "forward_authentication_port",     PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_forward_authentication_port),     NULL, 1812}, /* default RADIUS port */
+	{ "forward_authentication_port",     PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_forward_authentication_port),     NULL, "1812"}, /* default RADIUS port */
 
-	{ "forward_authentication_timeout",  PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_forward_authentication_timeout),  NULL, 10},
-	{ "forward_authentication_retries",  PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_forward_authentication_retries),  NULL, 3},
+	{ "forward_authentication_timeout",  PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_forward_authentication_timeout),  NULL, "10"},
+	{ "forward_authentication_retries",  PW_TYPE_INTEGER,    offsetof(rlm_ftress_t, conf_forward_authentication_retries),  NULL, "3"},
 
 	{ "forward_authentication_secret",   PW_TYPE_STRING_PTR, offsetof(rlm_ftress_t, conf_forward_authentication_secret),   NULL, NULL},
 
@@ -699,10 +699,10 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 			       forwarding_response);
 
 			if (RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM == forwarding_response) {
-				continue;
+				continue; /* only RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM is retried */
 			}
 
-			break; /* only RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM is retried */
+			break;
 		}
 
 		if (RLM_FTRESS_FORWARD_AUTHENTICATION_ACCEPT == forwarding_response) {
