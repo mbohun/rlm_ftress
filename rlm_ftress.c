@@ -623,7 +623,7 @@ static int forward_authentication_request(void *instance, REQUEST *request) {
 
 }
 
-static int ftress_reset_failed_authentication_count(void *instance, REQUEST *request) {
+static int reset_failed_authentication_count(void *instance, REQUEST *request) {
 
 	const struct rlm_ftress_t* data = instance;
 
@@ -707,7 +707,7 @@ static int rlm_ftress_authenticate(void *instance, REQUEST *request) {
 
 		if (RLM_FTRESS_FORWARD_AUTHENTICATION_ACCEPT == forwarding_response) {
 			/* the 3rd party RADIUS server responded OK */
-			ftress_reset_failed_authentication_count(instance, request);
+			reset_failed_authentication_count(instance, request);
 			return RLM_MODULE_OK;
 		}
 	}
