@@ -1,0 +1,137 @@
+This document provides information about configuration of the 4TRESS RADIUS 
+front end (rlm_ftress). To successfully configure or change the configuration
+of rlm_ftress, the user/administrator needs to setup 3 configurations files:
+   /opt/4TRESS_RFE/etc/raddb/radiusd.conf
+   /opt/4TRESS_RFE/etc/raddb/clients.conf	
+   /opt/4TRESS_RFE/etc/raddb/users
+
+
+
+
+file: /opt/4TRESS_RFE/etc/raddb/radiusd.conf
+This file provides the main configuration for the 4TRESS RADIUS front end (rlm_ftress).
+
+'ftress' needs to be added to the 'authenticate' part of this file, like:
+
+authenticate {
+
+	ftress
+
+}
+
+And there needs to be a 'ftress' subsection in the 'modules' section of this file:
+
+modules {
+
+	ftress {
+	       use_ssl = yes
+	       
+	       # etc.
+	}
+
+}    
+
+Detailed description of valid configuration settings follows:
+
+use_ssl
+   type: boolean	
+   default: yes
+   description: this setting controls what protocol is going to be used in communication
+   		between rlm_ftress and 4TRESS server. (use_ssl = yes means SSL/HTTPS,
+		use_ssl = no means HTTP)
+
+admin_authentication_type_code
+   type: string
+   default:
+   description: Unique identifier of the 4TRESS authentication type that contains the
+   		endusers authentication statistics. rlm_ftress uses this to reset the
+		failure count of the 4TRESS users authenticator (device or username/password pair)
+		if a successful forwarded authentication is used.
+		
+server_authentication_type_code
+   type: string
+   default:
+   description: Unique identifier of the 4TRESS authentication type that rlm_ftress uses
+   		to authenticate itself to 4TRESS.
+
+server_channel  
+   type: string
+   default:
+   description: 4TRESS channel that rlm_ftress uses to authenticate itself to 4TRESS.
+
+server_username
+   type: string
+   default: n/a
+   description: The username used by rlm_ftress module to authenticate itself to a 4TRESS server.
+
+server_password
+   type: string
+   default: n/a
+   description: The password used by rlm_ftress module to authenticate itself to a 4TRESS server.
+
+user_channel
+   type: string
+   default:
+   description: 4TRESS channel used by the end users when they authenticate themselves through 
+   		rlm_ftress.
+
+user_authentication_type_code
+   type: string
+   default:
+   description: Unique identifier of the 4TRESS authentication type used by end users.
+
+security_domain
+   type: string
+   default:
+   description: The 4TRESS security domain that contains the end users that will be authenticating
+   		through rlm_ftress.
+
+endpoint_authenticator
+endpoint_authenticator_manager
+endpoint_device_manager
+   type: string (URL)
+   default: n/a
+   description: Endpoints are the URLs of different 4TRESS SOAP web services.
+
+radius_username_mapping
+   type: int
+   default: 0
+   description: This setting controls how to interpret the 'username' value from the RADIUS request.
+   		Currently 2 mappings are supported: 0 meaning that the value is interpreted as username,
+		1 meaning that the value is to be interpreted as a device serial number.
+
+forward_authentication_mode
+   type: boolean
+   default: no
+   description: This setting enables forwarding of authentication requests to a 3rd party RADIUS server.
+   		Some clients have been already using some RADIUS server, this setting allows to forward
+		authentication requests that didn't succeed against 4TRESS to a 3rd party RADIUS server.
+		This feature exists mainly to support migration from a 3rd party RADIUS servers to 
+		4TRESS. 
+
+   forward_authentication_server
+      type: IP address
+      default: n/a
+      description: IP address (IPv4) of the 3rd party RADIUS server 
+      		   (example: forward_authentication_server = 192.168.1.22) 
+
+   forward_authentication_port
+      type: integer
+      default: 1812
+      description: Port number of the 3rd party RADIUS server
+
+   forward_authentication_secret
+      type: string
+      default: n/a
+      description: The shared secret to be used between the 3rd party RADIUS server and its clients.
+      		   From 3rd party RADIUS server rlm_ftress is just a RADIUS client.
+
+
+
+file: /opt/4TRESS_RFE/etc/raddb/clients.conf
+      This file defines what clients (IP addresses) are going to be allowed to connect to 
+      the RADIUS front end (rlm_ftress).
+
+file: /opt/4TRESS_RFE/etc/raddb/users
+      In this file the 'DEFAULT Auth-Type' needs to be set to ftress: 
+      DEFAULT	Auth-Type = ftress

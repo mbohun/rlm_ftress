@@ -1,0 +1,81 @@
+copy constructors (for "deep" copies)
+
+requirement: When working with QuickStartAPI one has to consider the lifespan of
+             different objects. this applies mainly to objects that are composed
+             of other objects, and providing functions for accessing these 
+             sub-objects as "shallow" copies.
+
+             Some of the sub-objects (for example: UserCode, Alsi) are required to 
+             live (exist) longer than the structures they are part of. However
+             this is currently not possible because the sub-objects are currently
+             being freed as part of the other objects that contain them. 
+
+             We need to make sure that UserCode and Alsi objects live independently 
+             from objects that hold a pointer to it. 
+
+             functions like:
+             
+             UserCode uc = ftress_some_response_get_user_code(response);
+             Alsi a = ftress_some_function_get_alsi(/* ... */);
+
+             need to return a "deep" copy of UserCode or Alsi, and the user
+             has to use UserCode or Alsi destructor to free those.
+
+
+             (As well)
+             another problem is how the objects use the resources (other objects) 
+             that are used for constructing objects (for example UserCode is 
+             constructed from a given string):
+
+             UserCode uc = ftress_user_code_create(some_string);
+
+             we don't want to be making any assumptions about 'some_string' - we are
+             going to copy it, so instead of:
+
+             struct ftressDTO__UserCode * ftress_user_code_create(char *code) {
+                    struct ftressDTO__UserCode* userCode = ftress_user_code_create_default();
+                    if(userCode != NULL) {
+                                userCode->code = code;  
+                                return userCode;
+                    }
+                    
+                    return NULL;
+             }
+
+             we want:
+
+             struct ftressDTO__UserCode * ftress_user_code_create(char *code) {
+                    struct ftressDTO__UserCode* userCode = ftress_user_code_create_default();
+                    if(userCode != NULL) {
+                                userCode->code = strdup(code); /* COPY THE code string ! */
+                                return userCode;
+                    }
+                    
+                    return NULL;
+             }
+
+             of course the destructor needs to be adjusted as well:
+             
+
+             const int ftress_user_code_free(struct ftressDTO__UserCode *userCode) {
+                   if(userCode != NULL) {
+                               if (userCode->code != NULL) {
+                                  free(userCode->code); /* free the string first */
+                               }
+                               free(userCode);         
+                               userCode = NULL;
+                               return 1;
+                   }
+                   return ERROR;
+             }
+
+conclusion:  We need to identify and implement "deep" copy constructors for some
+             of the objects, as well to modify some of the functions that are
+             returning these objects to return "deep" instead of "shallow" copies.
+             
+             So far we identified:
+             Alsi
+             UserCode
+
+             *TO BE ALWAYS* "deep" copies. This way the user is always responsible
+             for freeing those.
