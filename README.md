@@ -11,6 +11,9 @@ $ cd freeradius-1.1.8/src/modules
 $ git clone git://github.com/mbohun/rlm_ftress.git
 $ echo "rlm_ftress" >> stable
 # cp QuickStartAPI (ftress.so/ftress.a) rlm_ftress
+
+
+
 $ cd rlm_ftress
 $ ./autogen.sh
 $ cd ../../..
