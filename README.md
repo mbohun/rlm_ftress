@@ -3,61 +3,38 @@ rlm_ftress
 
 [4TRESS](http://www.actividentity.com/products/strongauthentication/4TRESSAuthenticationAppliance) plugin for [FreeRADIUS](http://freeradius.org) I wrote back in 2007-2008 while working for [ActivIdentity](http://www.actividentity.com)
 
+
+
+## configuring/building/installing
+Get the FreeRadius server source (the 1.1.x series is supported):
 ```
 $ cd ~/src
 $ wget ftp://ftp.freeradius.org/pub/radius/freeradius-1.1.8.tar.bz2
 $ tar -jxvf freeradius-1.1.8.tar.bz2
+```
+
+Go to the module subdir and clone/checkout/copy in the rlm_ftress source: 
+```
 $ cd freeradius-1.1.8/src/modules
 $ git clone git://github.com/mbohun/rlm_ftress.git
+```
+
+The freeradius-1.1.8/src/modules/stable file is used to specify which FreeRADIUS modules/plugins will be build:
+```
 $ echo "rlm_ftress" >> stable
 ```
 
+Go into the rlm_ftress module dir and run the `autogen.sh` script to generate the `configure` file (this needs to be done only once):
 ```
 $ cd rlm_ftress
-# get/copy the QuickStartAPI library (either the static lib ftress.a, or the shared lib ftress.so)
-#
 $ cp ~/QuickStartAPI/ftress.a .
 $ ./autogen.sh
 ```
 
+Go back to the FreeRADIUS top level dir and run a standard `./configure; make; sudo make install` build. Note: The QuickStartAPI library (either the shared libftress.so or the static libftress.a) needs to be available to the linker.
 ```
 $ cd ~/src/freeradius-1.1.8
 $ ./configure --prefix=/opt/freeradius-1.1.8
-```
-
-```
-...
-
-checking for fgetspent... yes
-checking for fgetgrent... yes
-configure: creating ./config.status
-config.status: creating Makefile
-config.status: creating config.h
-config.status: config.h is unchanged
-=== configuring in src/modules/rlm_checkval (/home/martin/src/freeradius-1.1.8/src/modules/rlm_checkval)
-configure: running /bin/sh ./configure '--prefix=/opt/freeradius-1.1.8'  '--enable-ltdl-install' --cache-file=/dev/null --srcdir=.
-configure: creating ./config.status
-config.status: creating Makefile
-=== configuring in src/modules/rlm_ftress (/home/martin/src/freeradius-1.1.8/src/modules/rlm_ftress)
-configure: running /bin/sh ./configure '--prefix=/opt/freeradius-1.1.8'  '--enable-ltdl-install' --cache-file=/dev/null --srcdir=.
-configure: WARNING: unrecognized options: --enable-ltdl-install
-checking for gcc... gcc
-checking whether the C compiler works... yes
-checking for C compiler default output file name... a.out
-checking for suffix of executables... 
-checking whether we are cross compiling... no
-checking for suffix of object files... o
-checking whether we are using the GNU C compiler... yes
-checking whether gcc accepts -g... yes
-checking for gcc option to accept ISO C89... none needed
-checking how to run the C preprocessor... gcc -E
-configure: creating ./config.status
-config.status: creating Makefile
-configure: WARNING: unrecognized options: --enable-ltdl-install
-[martin@firewolf freeradius-1.1.8]$ 
-```
-
-```
 $ make
 $ sudo make install
 ```
