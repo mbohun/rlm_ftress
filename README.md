@@ -10,15 +10,21 @@ $ tar -jxvf freeradius-1.1.8.tar.bz2
 $ cd freeradius-1.1.8/src/modules
 $ git clone git://github.com/mbohun/rlm_ftress.git
 $ echo "rlm_ftress" >> stable
-# cp QuickStartAPI (ftress.so/ftress.a) rlm_ftress
 
 
-
+```
 $ cd rlm_ftress
+# get/copy the QuickStartAPI library (either the static lib ftress.a, or the shared lib ftress.so)
+#
+$ cp ~/QuickStartAPI/ftress.a .
 $ ./autogen.sh
-$ cd ../../..
+```
+
+```
+$ cd ~/src/freeradius-1.1.8
 $ ./configure --prefix=/opt/freeradius-1.1.8
 ```
+
 ```
 ...
 
@@ -49,8 +55,8 @@ configure: creating ./config.status
 config.status: creating Makefile
 configure: WARNING: unrecognized options: --enable-ltdl-install
 [martin@firewolf freeradius-1.1.8]$ 
-
 ```
+
 ```
 $ make
 $ sudo make install
