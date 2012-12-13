@@ -5,7 +5,7 @@ rlm_ftress
 
 
 
-## configuring/building/installing
+## building & installing
 Get the FreeRadius server source (the 1.1.x series is supported):
 ```
 $ cd ~/src
@@ -24,10 +24,9 @@ The `freeradius-1.1.8/src/modules/stable` file is used to specify which FreeRADI
 $ echo "rlm_ftress" >> stable
 ```
 
-Go into the rlm_ftress module dir and run the `autogen.sh` script to generate the `configure` file (this needs to be done only once):
+Go into the `rlm_ftress` module dir and run the `autogen.sh` script to generate the `configure` file (this needs to be done only once):
 ```
 $ cd rlm_ftress
-$ cp ~/QuickStartAPI/ftress.a .
 $ ./autogen.sh
 ```
 
