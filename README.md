@@ -13,7 +13,7 @@ $ wget ftp://ftp.freeradius.org/pub/radius/freeradius-1.1.8.tar.bz2
 $ tar -jxvf freeradius-1.1.8.tar.bz2
 ```
 
-Go to the module subdir and clone/checkout/copy in the rlm_ftress source: 
+Go to the `modules` subdir and clone/checkout/copy in the `rlm_ftress` source: 
 ```
 $ cd freeradius-1.1.8/src/modules
 $ git clone git://github.com/mbohun/rlm_ftress.git
