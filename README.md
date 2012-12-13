@@ -1,7 +1,8 @@
 rlm_ftress
 ==========
 
-4TRESS plugin for [FreeRADIUS](http://freeradius.org)
+[4TRESS](http://www.actividentity.com/products/strongauthentication/4TRESSAuthenticationAppliance) plugin for [FreeRADIUS](http://freeradius.org) I wrote back in 2007-2008 while working for [ActivIdentity](http://www.actividentity.com)
+
 
 ```
 $ cd ~/src
