@@ -19,7 +19,7 @@ $ cd freeradius-1.1.8/src/modules
 $ git clone git://github.com/mbohun/rlm_ftress.git
 ```
 
-The freeradius-1.1.8/src/modules/stable file is used to specify which FreeRADIUS modules/plugins will be build:
+The `freeradius-1.1.8/src/modules/stable` file is used to specify which FreeRADIUS modules/plugins will be build:
 ```
 $ echo "rlm_ftress" >> stable
 ```
