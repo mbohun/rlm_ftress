@@ -3,7 +3,6 @@ rlm_ftress
 
 [4TRESS](http://www.actividentity.com/products/strongauthentication/4TRESSAuthenticationAppliance) plugin for [FreeRADIUS](http://freeradius.org) I wrote back in 2007-2008 while working for [ActivIdentity](http://www.actividentity.com)
 
-
 ```
 $ cd ~/src
 $ wget ftp://ftp.freeradius.org/pub/radius/freeradius-1.1.8.tar.bz2
@@ -11,7 +10,7 @@ $ tar -jxvf freeradius-1.1.8.tar.bz2
 $ cd freeradius-1.1.8/src/modules
 $ git clone git://github.com/mbohun/rlm_ftress.git
 $ echo "rlm_ftress" >> stable
-
+```
 
 ```
 $ cd rlm_ftress
