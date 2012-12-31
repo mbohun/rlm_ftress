@@ -3,7 +3,7 @@ rlm_ftress
 
 [4TRESS](http://www.actividentity.com/products/strongauthentication/4TRESSAuthenticationAppliance) plugin for [FreeRADIUS](http://freeradius.org) I wrote back in 2007-2008 while working for [ActivIdentity](http://www.actividentity.com)
 
-
+![Alt text](https://raw.github.com/mbohun/rlm_ftress/master/doc/rlm_ftress-overview.png "rlm_ftress overview")
 
 ## building & installing
 Get the FreeRadius server source (the 1.1.x series is supported):
