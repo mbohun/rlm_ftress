@@ -5,6 +5,8 @@ rlm_ftress
 
 ![Alt text](https://raw.github.com/mbohun/rlm_ftress/master/doc/rlm_ftress-overview.png "rlm_ftress overview")
 
+![Alt text](https://raw.github.com/mbohun/rlm_ftress/master/doc/rlm_ftress-plugin-architecture.png "rlm_ftress plugin architecture")
+
 ## building & installing
 Get the FreeRadius server source (the 1.1.x series is supported):
 ```
