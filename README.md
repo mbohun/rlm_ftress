@@ -73,21 +73,26 @@ At the startup FreeRADIUS server parses its configuration files and it attempts 
 ```
 
 ### CONSTRUCTOR (instantiation)
-The first function called for each module is the module 'constructor', see module_t rlm_ftress for details, the constructor is rlm_ftress_instantiate. The constructor (rlm_ftress_instantiate) invokes the built in configuration properties parser. FreeRADIUS is going to use its built in parser that parses the configuration properties and stores them in variables (usually packed in a struct) in the module.
+The first function called for each module is the module 'constructor', see `module_t rlm_ftress` for details, the constructor is `rlm_ftress_instantiate`. The constructor (`rlm_ftress_instantiate`) invokes the built in configuration properties parser. FreeRADIUS is going to use its built in parser that parses the configuration properties and stores them in variables (usually packed in a struct) in the module.
 To do this the module has to:
-1. define the variables, see struct rlm_ftress_t
-2. setup the array of config options for the FreeRADIUS internal parser,
-   see CONF_PARSER module_config[]
+
+1. define the variables, see struct `rlm_ftress_t`
+
+2. setup the array of config options for the FreeRADIUS internal parser, see `CONF_PARSER module_config[]`
  
-every config property has 5 attributes:
+Every config property has 5 attributes:
 1. name
+
 2. type (FreeRADIUS supports 4 types:
    PW_TYPE_BOOLEAN
    PW_TYPE_STRING_PTR
    PW_TYPE_INTEGER
    PW_TYPE_IPADDR
+
 3. mem location (variable) where to store the parsed result
+
 4. not used
+
 5. default value
 
 example:
