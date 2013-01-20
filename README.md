@@ -81,6 +81,7 @@ To do this the module has to:
 2. setup the array of config options for the FreeRADIUS internal parser, see `CONF_PARSER module_config[]`
  
 Every config property has 5 attributes:
+
 1. name
 
 2. type (FreeRADIUS supports 4 types:
