@@ -10,7 +10,7 @@ rlm_ftress
 
 ## implementation notes
 
-OVERVIEW
+### OVERVIEW
 This document describes the implementation of rlm_ftress - a plugin for FreeRADIUS server that connects 4TRESS server and FreeRADIUS. The actual communication is not done by rlm_ftress directly, but through libftress that uses SOAP to comunicate with 4TRESS server.
 
 PREREQUIREMENTS
