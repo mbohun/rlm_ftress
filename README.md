@@ -99,7 +99,7 @@ Every config property has 5 attributes:
 5. default value
 
 example:
-```
+```C
 static CONF_PARSER module_config[] = {
         /* name,     type,            mem location (variable),              NULL,  default value */
         { "use_ssl", PW_TYPE_BOOLEAN, offsetof(rlm_ftress_t, conf_use_ssl), NULL, "yes"},
@@ -168,6 +168,7 @@ At the rlm_ftress module shutdown FreeRADIUS invokes its destructor - that is us
 4. frees all the parsed string configuration properties (only configuration properties of type `PW_TYPE_STRING_PTR` were allocated dynamically and therefore need to be freed) 
 
 ### CONSTANTS
+
 `FTRESS_ERROR_AUTHENTICATE_BAD_OTP` - returned by libftress if an authentication on 4TRESS server failed because of bad OTP
 `RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM` - returned if there was a problem to communicate with 4TRESS server
 `RLM_FTRESS_FORWARD_AUTHENTICATION_ACCEPT` - returned if forwarded authentication succeeded
