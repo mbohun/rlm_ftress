@@ -329,7 +329,7 @@ RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM
 ```C
 static int reset_failed_authentication_count(void *instance, REQUEST *request)
 ```
-    This function calls libftress `ftress_reset_device_authenticator_failed_authentication_count` to reset the failed authentication counter on 4TRESS server.
+  This function calls libftress `ftress_reset_device_authenticator_failed_authentication_count` to reset the failed authentication counter on 4TRESS server.
     ```
     Return codes:
     1 on success
