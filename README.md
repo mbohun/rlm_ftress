@@ -229,13 +229,19 @@ AuthenticationTypeCode user_authentication_type_code
 
 ### FUNCTION REFERENCE
 
-`static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)`
+```C
+static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
+```
 Constructor.
 
-`static int rlm_ftress_detach(void *instance)`
+```C
+static int rlm_ftress_detach(void *instance)
+```
 Destructor.
 
-`static int rlm_ftress_authenticate(void *instance, REQUEST *request)`
+```C
+static int rlm_ftress_authenticate(void *instance, REQUEST *request)
+```
 This is the main function of rlm_ftress for authentication. It contains all of the 'high level' logic used for authentication of users, and optional authentication forwarding to a 3rd party server and failed authentication counter reseting on 4TRESS server. 
 Return codes:
 `RLM_MODULE_OK` on success
