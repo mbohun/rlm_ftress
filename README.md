@@ -9,28 +9,21 @@ rlm_ftress
 ![Alt text](https://raw.github.com/mbohun/rlm_ftress/master/doc/rlm_ftress-plugin-architecture.png "rlm_ftress plugin architecture")
 
 ## implementation notes
+
 OVERVIEW
-  This document describes the implementation of rlm_ftress - a plugin for FreeRADIUS
-  server that connects 4TRESS server and FreeRADIUS. The actual communication
-  is not done by rlm_ftress directly, but through libftress that uses SOAP to
-  comunicate with 4TRESS server.
+This document describes the implementation of rlm_ftress - a plugin for FreeRADIUS server that connects 4TRESS server and FreeRADIUS. The actual communication is not done by rlm_ftress directly, but through libftress that uses SOAP to comunicate with 4TRESS server.
 
 PREREQUIREMENTS
-  In order to understand this document some basic knowledge of FreeRADIUS is required,
-  mainly:
-    FreeRADIUS module interface documentation
-    FreeRADIUS configuration files documentation
+In order to understand this document some basic knowledge of FreeRADIUS is required, mainly:
+FreeRADIUS module interface documentation
+FreeRADIUS configuration files documentation
 
 NAMING CONVENTIONS
-  libftress functions are prefixed with ftress_, please refer to libftress documentation
-  and to ftress.h
+libftress functions are prefixed with ftress_, please refer to libftress documentation and to ftress.h
 
 SOURCE CODE WALKTHROUGH
-  At the startup FreeRADIUS server parses its configuration files and it attempts to load
-  every module present in 'modules' section of the $FREERADIUS/etc/raddb/radius.conf file.
-  Every module has 0..n configuration properties. For illustration here is an example of
-  rlm_ftress configuration properties (lines starting with # are comments):
-
+At the startup FreeRADIUS server parses its configuration files and it attempts to load every module present in 'modules' section of the $FREERADIUS/etc/raddb/radius.conf file. Every module has 0..n configuration properties. For illustration here is an example of rlm_ftress configuration properties (lines starting with # are comments):
+```
   modules {
 
         # ...
@@ -77,35 +70,28 @@ SOURCE CODE WALKTHROUGH
         }
 
   }
+```
 
 CONSTRUCTOR (instantiation)
-  The first function called for each module is the module 'constructor', see
-  module_t rlm_ftress for details, the constructor is rlm_ftress_instantiate.
-  
-  The constructor (rlm_ftress_instantiate) invokes the built in configuration
-  properties parser.
-  FreeRADIUS is going to use its built in parser that parses the configuration
-  properties and stores them in variables (usually packed in a struct) in the
-  module.
-  
-  To do this the module has to:
-  1. define the variables, see struct rlm_ftress_t
-  2. setup the array of config options for the FreeRADIUS internal parser,
-     see CONF_PARSER module_config[]
+The first function called for each module is the module 'constructor', see module_t rlm_ftress for details, the constructor is rlm_ftress_instantiate. The constructor (rlm_ftress_instantiate) invokes the built in configuration properties parser. FreeRADIUS is going to use its built in parser that parses the configuration properties and stores them in variables (usually packed in a struct) in the module.
+To do this the module has to:
+1. define the variables, see struct rlm_ftress_t
+2. setup the array of config options for the FreeRADIUS internal parser,
+   see CONF_PARSER module_config[]
  
-     every config property has 5 attributes:
-     1. name
-     2. type (FreeRADIUS supports 4 types:
-        PW_TYPE_BOOLEAN
-        PW_TYPE_STRING_PTR
-        PW_TYPE_INTEGER
-        PW_TYPE_IPADDR
-     3. mem location (variable) where to store the parsed result
-     4. TODO ?
-     5. default value
+every config property has 5 attributes:
+1. name
+2. type (FreeRADIUS supports 4 types:
+   PW_TYPE_BOOLEAN
+   PW_TYPE_STRING_PTR
+   PW_TYPE_INTEGER
+   PW_TYPE_IPADDR
+3. mem location (variable) where to store the parsed result
+4. not used
+5. default value
 
-     example:
-
+example:
+```
      static CONF_PARSER module_config[] = {
 
         /* name      type             mem location (variable)               ?TODO default value */
@@ -115,79 +101,52 @@ CONSTRUCTOR (instantiation)
 
 	{ NULL, -1, 0, NULL, NULL} /* terminate the array of configuration properties */
      };
+```
 
+After this 'generic' bit the module is to do its own custom initialization - rlm_ftress does:
+1. calls is_valid_radius_username_mapping
+2. initializes libftress, depending on configuration property use_ssl sets HTTPS or HTTP mode for the rlm_ftress to 4TRESS server SOAP communication
+3. calls authenticate_module_to_ftress function to authenticate the module to 4TRESS server
+4. checks if the authentication was successful
+5. creates user_channel_code, admin_authentication_type_code and user_authentication_type_code
+6. calls set_radius_username_mapping_mode to setup so called username mapping mode (basically the usernames are interpreted as usernames, or device serial numbers, see bellow the dscription of the set_radius_username_mapping_mode function for details)
+7. based on the value of forward_authentication_mode configuration property creates a client socket for so called authentication forwarding, see rlm_ftress_authenticate and forward_authentication_request function description bellow for more details
 
-     After this 'generic' bit the module is to do its own custom initialization - rlm_ftress does:
-     1. calls is_valid_radius_username_mapping
-     2. initializes libftress, depending on configuration property use_ssl sets HTTPS or HTTP mode
-        for the rlm_ftress to 4TRESS server SOAP communication
-     3. calls authenticate_module_to_ftress function to authenticate the module to 4TRESS server
-     4. checks if the authentication was successful
-     5. creates user_channel_code, admin_authentication_type_code and user_authentication_type_code
-     6. calls set_radius_username_mapping_mode to setup so called username mapping mode
-        (basically the usernames are interpreted as usernames, or device serial numbers, see bellow
-        the dscription of the set_radius_username_mapping_mode function for details)
-     7. based on the value of forward_authentication_mode configuration property creates a client
-        socket for so called authentication forwarding, see rlm_ftress_authenticate and 
-        forward_authentication_request function description bellow for more details
-
-   At this stage the rlm_ftress is ready for accepting and processing the incoming authentications.
+At this stage the rlm_ftress is ready for accepting and processing the incoming authentications.
 
 AUTHENTICATION
-  Every FreeRADIUS module can register at least one of the 8 available function pointers:
-    1. authentication
-    2. authorization
-    3. preaccounting
-    4. accounting
-    5. checksimul
-    6. pre-proxy
-    7. post-proxy
-    8. post-auth
+Every FreeRADIUS module can register at least one of the 8 available function pointers:
+1. authentication
+2. authorization
+3. preaccounting
+4. accounting
+5. checksimul
+6. pre-proxy
+7. post-proxy
+8. post-auth
 
-    Because rlm_ftress at this stage does only authentication the only registered function
-    pointer is authentication, and it points to rlm_ftress_authenticate
-
-    rlm_ftress_authenticate function invokes authenticate_ftress_indirect_primary_device
-    function (described in detail bellow). 
-    1. authenticate_ftress_indirect_primary_device calls to 4TRESS server and fetches 
-       back the return code:
-         RLM_MODULE_OK - if the authentication on 4TRESS server succeded
-         FTRESS_ERROR_AUTHENTICATE_BAD_OTP - if the authentication on 4TRESS server failed
-
-    2. if authenticate_ftress_indirect_primary_device returns FTRESS_ERROR_AUTHENTICATE_BAD_OTP 
-       and rlm_ftress is set to forward authentications to a 3rd party RADIUS server, rlm_ftress
-       is going to call forward_authentication_request function and if the authentication to the
-       3rd party RADIUS server returns success reset_failed_authentication_count function is
-       called to reset the failed authentication counter on 4TRESS. This step is repeated 
-       conf_forward_authentication_retries times.
+Because rlm_ftress at this stage does only authentication the only registered function pointer is authentication, and it points to rlm_ftress_authenticate
+rlm_ftress_authenticate function invokes authenticate_ftress_indirect_primary_device function (described in detail bellow). 
+1. authenticate_ftress_indirect_primary_device calls to 4TRESS server and fetches back the return code:
+   RLM_MODULE_OK - if the authentication on 4TRESS server succeded
+   FTRESS_ERROR_AUTHENTICATE_BAD_OTP - if the authentication on 4TRESS server failed
+2. if authenticate_ftress_indirect_primary_device returns FTRESS_ERROR_AUTHENTICATE_BAD_OTP and rlm_ftress is set to forward authentications to a 3rd party RADIUS server, rlm_ftress is going to call forward_authentication_request function and if the authentication to the 3rd party RADIUS server returns success reset_failed_authentication_count function is called to reset the failed authentication counter on 4TRESS. This step is repeated conf_forward_authentication_retries times.
 
 DESTRUCTOR
-  At the rlm_ftress module shutdown FreeRADIUS invokes its destructor - that is used to free any
-  resources. The destructor function is rlm_ftress_detach. 
-  rlm_ftress_detach:
-  1. closes the client socket for authentication forwarding (if we opened one)
-  2. frees all resources required by libftress
-  3. shuts down libftress
-  4. frees all the parsed string configuration properties (only configuration properties of type 
-     PW_TYPE_STRING_PTR were allocated dynamically and therefore need to be freed) 
+At the rlm_ftress module shutdown FreeRADIUS invokes its destructor - that is used to free any resources. The destructor function is rlm_ftress_detach. rlm_ftress_detach:
+1. closes the client socket for authentication forwarding (if we opened one)
+2. frees all resources required by libftress
+3. shuts down libftress
+4. frees all the parsed string configuration properties (only configuration properties of type PW_TYPE_STRING_PTR were allocated dynamically and therefore need to be freed) 
 
 CONSTANTS
-
-  FTRESS_ERROR_AUTHENTICATE_BAD_OTP 
-    returned by libftress if an authentication on 4TRESS server failed because of bad OTP
-
-  RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM
-    returned if there was a problem to communicate with 4TRESS server
-
-  RLM_FTRESS_FORWARD_AUTHENTICATION_ACCEPT
-    returned if forwarded authentication succeeded
-
-  RLM_FTRESS_FORWARD_AUTHENTICATION_REJECT
-    returned if forwarded authentication failed
+FTRESS_ERROR_AUTHENTICATE_BAD_OTP - returned by libftress if an authentication on 4TRESS server failed because of bad OTP
+RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM - returned if there was a problem to communicate with 4TRESS server
+RLM_FTRESS_FORWARD_AUTHENTICATION_ACCEPT - returned if forwarded authentication succeeded
+RLM_FTRESS_FORWARD_AUTHENTICATION_REJECT - returned if forwarded authentication failed
 
 DATA STRUCTURES
-
-  module_t rlm_ftress
+module_t rlm_ftress
     Every FreeRADIUS module has to setup this structure, i.e. register function pointers
     for construction, destruction, and at least one of the following: authentication,
     authorization, preaccounting, accounting, checksimul, pre-proxy, post-proxy,
