@@ -84,13 +84,7 @@ Every config property has 5 attributes:
 
 1. name
 
-2. type, FreeRADIUS supports 4 types:
-   ```
-   PW_TYPE_BOOLEAN
-   PW_TYPE_STRING_PTR
-   PW_TYPE_INTEGER
-   PW_TYPE_IPADDR
-   ```
+2. type, one of `PW_TYPE_BOOLEAN`, `PW_TYPE_STRING_PTR`, `PW_TYPE_INTEGER`, `PW_TYPE_IPADDR`
 
 3. mem location (variable) where to store the parsed result
 
@@ -234,23 +228,31 @@ static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 ```
 Constructor.
 
+
 ```C
 static int rlm_ftress_detach(void *instance)
 ```
 Destructor.
 
+
 ```C
 static int rlm_ftress_authenticate(void *instance, REQUEST *request)
 ```
 This is the main function of rlm_ftress for authentication. It contains all of the 'high level' logic used for authentication of users, and optional authentication forwarding to a 3rd party server and failed authentication counter reseting on 4TRESS server. 
+```
 Return codes:
-`RLM_MODULE_OK` on success
-`RLM_MODULE_REJECT` on failure
+RLM_MODULE_OK on success
+RLM_MODULE_REJECT on failure
+```
 
-`static void set_radius_username_mapping_mode(struct rlm_ftress_t* data)`
+
+```C
+static void set_radius_username_mapping_mode(struct rlm_ftress_t* data)
+```
 Helper function for setting username mapping mode. Depending on the value of radius_username_mapping property in the `$FREERADIUS/etc/raddb/radius.conf` file it assigns the following pointers:
 
-```
+
+```C
 static void (*create_search_criteria) (const char* username, UserCode* uc, DeviceSearchCriteria* dsc)
 static void (*free_search_criteria) (UserCode* uc, DeviceSearchCriteria* dsc)
 static void (*get_user_code)(struct rlm_ftress_t* data, const char* username, UserCode* uc)
@@ -273,38 +275,67 @@ rlm_ftress_t.active_authentication_type_code : rlm_ftress_t.admin_authentication
 ```
 This approach was chosen to avoid cluttering every function that uses any of these 4 pointers with if-else blocks.
 
-`static void display_radius_username_mapping_info()`
+
+```C
+static void display_radius_username_mapping_info()
+```
 Helper function that displays a table of supported username mapping modes. This function is called when `is_valid_radius_username_mapping` returns an error, i.e. the `radius_username_mapping` property in the `$FREERADIUS/etc/raddb/radius.conf file is set to invalid value. This way the user gets a list of supported values (and their human readable names).
 
-`static int is_valid_radius_username_mapping(const int mapping)`
-Helper function that validates if `radius_username_mapping` property in the `$FREERADIUS/etc/raddb/radius.conf` file is set to a valid value. 
-Return codes:
-`1` on success
-`0` on failure
 
-`static int authenticate_module_to_ftress(void* instance)`
+```C
+static int is_valid_radius_username_mapping(const int mapping)
+```
+Helper function that validates if `radius_username_mapping` property in the `$FREERADIUS/etc/raddb/radius.conf` file is set to a valid value. 
+```
+Return codes:
+1 on success
+0 on failure
+```
+
+
+```C
+static int authenticate_module_to_ftress(void* instance)
+```
 This function calls libftress `ftress_primary_authenticate_up` function to authenticate rlm_ftress to 4TRESS server with username and password that are set in `$FREERADIUS/etc/raddb/radius.conf` (`server_username`/`server_password` configuration properties). The success or failure of authentication are determined by the value of `rlm_ftress_t.module_alsi` this function populates on success, on authentication failure, or communication failure `rlm_ftress_t.module_alsi` is set to `NULL`.
+```
 Return codes:
 Allways 0
+```
 
-`static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *request)`
+
+```C
+static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *request)
+```
 This function calls libftress `ftress_indirect_primary_authenticate_device` function to authenticate users with username/OTP. 
+```
 Return codes:
-`RLM_MODULE_OK` on success
-`RLM_MODULE_REJECT` on failure
+RLM_MODULE_OK on success
+RLM_MODULE_REJECT on failure
+```
 
-`static int forward_authentication_request(void *instance, REQUEST *request)`
+
+```C
+static int forward_authentication_request(void *instance, REQUEST *request)
+```
 This function uses the client socket to forward authentication requests to a 3rd party RADIUS server.
+```
 Return codes:
-`RLM_FTRESS_FORWARD_AUTHENTICATION_ACCEPT `
-`RLM_FTRESS_FORWARD_AUTHENTICATION_REJECT`
-`RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM`
+RLM_FTRESS_FORWARD_AUTHENTICATION_ACCEPT
+RLM_FTRESS_FORWARD_AUTHENTICATION_REJECT
+RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM
+```
 
-`static int reset_failed_authentication_count(void *instance, REQUEST *request)`
+
+```C
+static int reset_failed_authentication_count(void *instance, REQUEST *request)
+```
 This function calls libftress `ftress_reset_device_authenticator_failed_authentication_count` to reset the failed authentication counter on 4TRESS server.
+```
 Return codes:
-`1` on success
-`0` on failure
+1 on success
+0 on failure
+```
+
 
 ## building & installing
 Get the FreeRadius server source (the 1.1.x series is supported):
