@@ -98,52 +98,72 @@ Every config property has 5 attributes:
 
 example:
 ```
-     static CONF_PARSER module_config[] = {
-
+static CONF_PARSER module_config[] = {
         /* name      type             mem location (variable)               ?TODO default value */
-  { "use_ssl", PW_TYPE_BOOLEAN, offsetof(rlm_ftress_t, conf_use_ssl), NULL, "yes"},
+        { "use_ssl", PW_TYPE_BOOLEAN, offsetof(rlm_ftress_t, conf_use_ssl), NULL, "yes"},
 
         /* more configuration properties ... */
 
 	{ NULL, -1, 0, NULL, NULL} /* terminate the array of configuration properties */
-     };
+};
 ```
 
 After this 'generic' bit the module is to do its own custom initialization - rlm_ftress does:
-1. calls is_valid_radius_username_mapping
-2. initializes libftress, depending on configuration property use_ssl sets HTTPS or HTTP mode for the rlm_ftress to 4TRESS server SOAP communication
-3. calls authenticate_module_to_ftress function to authenticate the module to 4TRESS server
+
+1. call `is_valid_radius_username_mapping`
+
+2. initializes libftress, depending on configuration property `use_ssl` sets HTTPS or HTTP mode for the rlm_ftress to 4TRESS server SOAP communication
+
+3. call `authenticate_module_to_ftress` function to authenticate the module to 4TRESS server
+
 4. checks if the authentication was successful
-5. creates user_channel_code, admin_authentication_type_code and user_authentication_type_code
-6. calls set_radius_username_mapping_mode to setup so called username mapping mode (basically the usernames are interpreted as usernames, or device serial numbers, see bellow the dscription of the set_radius_username_mapping_mode function for details)
-7. based on the value of forward_authentication_mode configuration property creates a client socket for so called authentication forwarding, see rlm_ftress_authenticate and forward_authentication_request function description bellow for more details
+
+5. creates `user_channel_code`, `admin_authentication_type_code` and `user_authentication_type_code`
+
+6. call `set_radius_username_mapping_mode` to setup so called username mapping mode (basically the usernames are interpreted as usernames, or device serial numbers, see bellow the dscription of the `set_radius_username_mapping_mode` function for details)
+
+7. based on the value of `forward_authentication_mode` configuration property creates a client socket for so called authentication forwarding, see `rlm_ftress_authenticate` and `forward_authentication_request` function description bellow for more details
 
 At this stage the rlm_ftress is ready for accepting and processing the incoming authentications.
 
 ### AUTHENTICATION
 Every FreeRADIUS module can register at least one of the 8 available function pointers:
+
 1. authentication
+
 2. authorization
+
 3. preaccounting
+
 4. accounting
+
 5. checksimul
+
 6. pre-proxy
+
 7. post-proxy
+
 8. post-auth
 
-Because rlm_ftress at this stage does only authentication the only registered function pointer is authentication, and it points to rlm_ftress_authenticate
-rlm_ftress_authenticate function invokes authenticate_ftress_indirect_primary_device function (described in detail bellow). 
+Because rlm_ftress at this stage does only support authentication the only registered function pointer is authentication, and it points to `rlm_ftress_authenticate`
+`rlm_ftress_authenticate` function invokes `authenticate_ftress_indirect_primary_device` function (described in detail bellow).
+
 1. authenticate_ftress_indirect_primary_device calls to 4TRESS server and fetches back the return code:
-   RLM_MODULE_OK - if the authentication on 4TRESS server succeded
-   FTRESS_ERROR_AUTHENTICATE_BAD_OTP - if the authentication on 4TRESS server failed
-2. if authenticate_ftress_indirect_primary_device returns FTRESS_ERROR_AUTHENTICATE_BAD_OTP and rlm_ftress is set to forward authentications to a 3rd party RADIUS server, rlm_ftress is going to call forward_authentication_request function and if the authentication to the 3rd party RADIUS server returns success reset_failed_authentication_count function is called to reset the failed authentication counter on 4TRESS. This step is repeated conf_forward_authentication_retries times.
+   `RLM_MODULE_OK` - if the authentication on 4TRESS server succeded
+   `FTRESS_ERROR_AUTHENTICATE_BAD_OTP` - if the authentication on 4TRESS server failed
+
+2. if authenticate_ftress_indirect_primary_device returns `FTRESS_ERROR_AUTHENTICATE_BAD_OTP` and rlm_ftress is set to forward authentications to a 3rd party RADIUS server, rlm_ftress is going to call `forward_authentication_request` function and if the authentication to the 3rd party RADIUS server returns success `reset_failed_authentication_count` function is called to reset the failed authentication counter on 4TRESS. This step is repeated `conf_forward_authentication_retries` times.
 
 ### DESTRUCTOR
-At the rlm_ftress module shutdown FreeRADIUS invokes its destructor - that is used to free any resources. The destructor function is rlm_ftress_detach. rlm_ftress_detach:
+At the rlm_ftress module shutdown FreeRADIUS invokes its destructor - that is used to free any resources. The destructor function is `rlm_ftress_detach`. `rlm_ftress_detach`:
+
 1. closes the client socket for authentication forwarding (if we opened one)
+
 2. frees all resources required by libftress
+
 3. shuts down libftress
-4. frees all the parsed string configuration properties (only configuration properties of type PW_TYPE_STRING_PTR were allocated dynamically and therefore need to be freed) 
+
+4. frees all the parsed string configuration properties (only configuration properties of type `PW_TYPE_STRING_PTR` were allocated dynamically and therefore need to be freed) 
 
 ### CONSTANTS
 FTRESS_ERROR_AUTHENTICATE_BAD_OTP - returned by libftress if an authentication on 4TRESS server failed because of bad OTP
