@@ -1,7 +1,7 @@
 rlm_ftress
 ==========
 
-[4TRESS](http://www.hidglobal.com/products/software/indentity-assurance/4tress-authentication-appliance) plugin for [FreeRADIUS](http://freeradius.org) I wrote back in 2007-2008 while working for [ActivIdentity](http://www.hidglobal.com/identity-assurance)
+[4TRESS](http://www.hidglobal.com/products/software/identity-assurance/4tress-authentication-appliance) plugin for [FreeRADIUS](http://freeradius.org) I wrote back in 2007-2008 while working for [ActivIdentity](http://www.hidglobal.com/identity-assurance)
 
 ![Alt text](https://raw.github.com/mbohun/rlm_ftress/master/doc/rlm_ftress-overview.png "rlm_ftress overview")
 
