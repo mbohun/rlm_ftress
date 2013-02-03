@@ -229,14 +229,12 @@ static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 Constructor.
 
 ---
-
 ```C
 static int rlm_ftress_detach(void *instance)
 ```
 Destructor.
 
 ---
-
 ```C
 static int rlm_ftress_authenticate(void *instance, REQUEST *request)
 ```
@@ -247,13 +245,10 @@ RLM_MODULE_OK on success
 RLM_MODULE_REJECT on failure
 ```
 ---
-
 ```C
 static void set_radius_username_mapping_mode(struct rlm_ftress_t* data)
 ```
 Helper function for setting username mapping mode. Depending on the value of `radius_username_mapping` property in the `$FREERADIUS/etc/raddb/radius.conf` file it assigns the following pointers:
-
-
 ```C
 static void (*create_search_criteria) (const char* username, UserCode* uc, DeviceSearchCriteria* dsc)
 static void (*free_search_criteria) (UserCode* uc, DeviceSearchCriteria* dsc)
@@ -277,13 +272,13 @@ rlm_ftress_t.active_authentication_type_code : rlm_ftress_t.admin_authentication
 ```
 This approach was chosen to avoid cluttering every function that uses any of these 4 pointers with if-else blocks.
 
-
+---
 ```C
 static void display_radius_username_mapping_info()
 ```
 Helper function that displays a table of supported username mapping modes. This function is called when `is_valid_radius_username_mapping` returns an error, i.e. the `radius_username_mapping` property in the `$FREERADIUS/etc/raddb/radius.conf file is set to invalid value. This way the user gets a list of supported values (and their human readable names).
 
-
+---
 ```C
 static int is_valid_radius_username_mapping(const int mapping)
 ```
@@ -293,7 +288,7 @@ Return codes:
 1 on success
 0 on failure
 ```
-
+---
 
 ```C
 static int authenticate_module_to_ftress(void* instance)
@@ -303,7 +298,7 @@ This function calls libftress `ftress_primary_authenticate_up` function to authe
 Return codes:
 Allways 0
 ```
-
+---
 
 ```C
 static int authenticate_ftress_indirect_primary_device(void *instance, REQUEST *request)
@@ -314,7 +309,7 @@ Return codes:
 RLM_MODULE_OK on success
 RLM_MODULE_REJECT on failure
 ```
-
+---
 
 ```C
 static int forward_authentication_request(void *instance, REQUEST *request)
@@ -326,7 +321,7 @@ RLM_FTRESS_FORWARD_AUTHENTICATION_ACCEPT
 RLM_FTRESS_FORWARD_AUTHENTICATION_REJECT
 RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM
 ```
-
+---
 
 ```C
 static int reset_failed_authentication_count(void *instance, REQUEST *request)
@@ -337,7 +332,7 @@ Return codes:
 1 on success
 0 on failure
 ```
-
+---
 
 ## building & installing
 Get the FreeRadius server source (the 1.1.x series is supported):
