@@ -227,13 +227,13 @@ AuthenticationTypeCode user_authentication_type_code
 static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 ```
 Constructor.
-
+---
 
 ```C
 static int rlm_ftress_detach(void *instance)
 ```
 Destructor.
-
+---
 
 ```C
 static int rlm_ftress_authenticate(void *instance, REQUEST *request)
