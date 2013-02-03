@@ -227,12 +227,14 @@ AuthenticationTypeCode user_authentication_type_code
 static int rlm_ftress_instantiate(CONF_SECTION *conf, void **instance)
 ```
 Constructor.
+
 ---
 
 ```C
 static int rlm_ftress_detach(void *instance)
 ```
 Destructor.
+
 ---
 
 ```C
@@ -244,7 +246,7 @@ Return codes:
 RLM_MODULE_OK on success
 RLM_MODULE_REJECT on failure
 ```
-
+---
 
 ```C
 static void set_radius_username_mapping_mode(struct rlm_ftress_t* data)
