@@ -123,7 +123,8 @@ After this 'generic' bit the module is to do its own custom initialization - rlm
 At this stage the rlm_ftress is ready for accepting and processing the incoming authentications.
 
 ### AUTHENTICATION
-Every FreeRADIUS module can register at least one of the 8 available function pointers:  
+Every FreeRADIUS module can register at least one of the 8 available function pointers:
+
 1. authentication
 2. authorization
 3. preaccounting
