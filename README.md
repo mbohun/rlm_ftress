@@ -123,22 +123,14 @@ After this 'generic' bit the module is to do its own custom initialization - rlm
 At this stage the rlm_ftress is ready for accepting and processing the incoming authentications.
 
 ### AUTHENTICATION
-Every FreeRADIUS module can register at least one of the 8 available function pointers:
-
+Every FreeRADIUS module can register at least one of the 8 available function pointers:  
 1. authentication
-
 2. authorization
-
 3. preaccounting
-
 4. accounting
-
 5. checksimul
-
 6. pre-proxy
-
 7. post-proxy
-
 8. post-auth
 
 Because `rlm_ftress` at this stage does only support authentication the only registered function pointer is authentication, and it points to `rlm_ftress_authenticate`
@@ -163,9 +155,9 @@ At the `rlm_ftress` module shutdown FreeRADIUS invokes its destructor - that is 
 
 ### CONSTANTS
 
-`FTRESS_ERROR_AUTHENTICATE_BAD_OTP` - returned by libftress if an authentication on 4TRESS server failed because of bad OTP
-`RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM` - returned if there was a problem to communicate with 4TRESS server
-`RLM_FTRESS_FORWARD_AUTHENTICATION_ACCEPT` - returned if forwarded authentication succeeded
+`FTRESS_ERROR_AUTHENTICATE_BAD_OTP` - returned by libftress if an authentication on 4TRESS server failed because of bad OTP  
+`RLM_FTRESS_FORWARD_AUTHENTICATION_PROBLEM` - returned if there was a problem to communicate with 4TRESS server  
+`RLM_FTRESS_FORWARD_AUTHENTICATION_ACCEPT` - returned if forwarded authentication succeeded  
 `RLM_FTRESS_FORWARD_AUTHENTICATION_REJECT` - returned if forwarded authentication failed
 
 ### DATA STRUCTURES
