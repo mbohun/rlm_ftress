@@ -77,19 +77,14 @@ The first function called for each module is the module 'constructor', see `modu
 To do this the module has to:
 
 1. define the variables, see struct `rlm_ftress_t`
-
 2. setup the array of config options for the FreeRADIUS internal parser, see `CONF_PARSER module_config[]`
- 
+
 Every config property has 5 attributes:
 
 1. name
-
 2. type, one of `PW_TYPE_BOOLEAN`, `PW_TYPE_STRING_PTR`, `PW_TYPE_INTEGER`, `PW_TYPE_IPADDR`
-
 3. mem location (variable) where to store the parsed result
-
 4. not used
-
 5. default value
 
 example:
@@ -107,17 +102,11 @@ static CONF_PARSER module_config[] = {
 After this 'generic' bit the module is to do its own custom initialization - rlm_ftress does:
 
 1. call `is_valid_radius_username_mapping`
-
 2. initializes libftress, depending on configuration property `use_ssl` sets HTTPS or HTTP mode for the rlm_ftress to 4TRESS server SOAP communication
-
 3. call `authenticate_module_to_ftress` function to authenticate the module to 4TRESS server
-
 4. checks if the authentication was successful
-
 5. creates `user_channel_code`, `admin_authentication_type_code` and `user_authentication_type_code`
-
 6. call `set_radius_username_mapping_mode` to setup so called username mapping mode (basically the usernames are interpreted as usernames, or device serial numbers, see bellow the dscription of the `set_radius_username_mapping_mode` function for details)
-
 7. based on the value of `forward_authentication_mode` configuration property creates a client socket for so called authentication forwarding, see `rlm_ftress_authenticate` and `forward_authentication_request` function description bellow for more details
 
 At this stage the rlm_ftress is ready for accepting and processing the incoming authentications.
