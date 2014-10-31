@@ -147,11 +147,8 @@ Because `rlm_ftress` at this stage does only support authentication the only reg
 At the `rlm_ftress` module shutdown FreeRADIUS invokes its destructor - that is used to free any resources. The destructor function is `rlm_ftress_detach`. `rlm_ftress_detach`:
 
 1. closes the client socket for authentication forwarding (if we opened one)
-
 2. frees all resources required by libftress
-
 3. shuts down libftress
-
 4. frees all the parsed string configuration properties (only configuration properties of type `PW_TYPE_STRING_PTR` were allocated dynamically and therefore need to be freed) 
 
 ### CONSTANTS
@@ -211,7 +208,6 @@ AuthenticationTypeCode user_authentication_type_code
 `RADIUS_USERNAME_MAPPING_TABLE[]` Static array of supported username mapping modes. Currently two modes are supported:
 
 1. USERNAME (`radius_username_mapping` set to 0, this is the default)
-
 2. DEVICE_SERIAL_NUMBER (`radius_username_mapping` set to 1)
 
 ### FUNCTION REFERENCE
