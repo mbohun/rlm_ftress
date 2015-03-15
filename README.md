@@ -1,4 +1,4 @@
-rlm_ftress
+rlm_ftress [![Build Status](https://travis-ci.org/mbohun/rlm_ftress.svg?branch=master)](https://travis-ci.org/mbohun/rlm_ftress)
 ==========
 
 [4TRESS](http://www.hidglobal.com/products/software/identity-assurance/4tress-authentication-appliance) plugin for [FreeRADIUS](http://freeradius.org) I wrote back in 2007-2008 while working for [ActivIdentity](http://www.hidglobal.com/identity-assurance)
