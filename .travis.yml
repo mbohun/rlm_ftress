@@ -27,10 +27,7 @@ before_script:
 
 script:
   - cd /tmp/freeradius-1.1.8
-  - ./configure LIBTOOL='/usr/bin/libtool' --with-system-libtool
+  - ./configure LIBTOOL='/usr/bin/libtool'
 # BRUTE-FORCE hack/workaround to force the use of /usr/bin/libtool;
 # given ./configure --with-system-libtool seems to be ignored by travis-ci/ubuntu?
-  - mv libtool libtool.crap
-  - ln -s /usr/bin/libtool libtool
-  - ls -la libtool
   - make
