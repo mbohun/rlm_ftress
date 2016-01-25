@@ -26,4 +26,11 @@ before_script:
 #  - ./autogen.sh
 
 script:
-  - "cd /tmp/freeradius-1.1.8 && ./configure --with-system-libtool --prefix=/opt/freeradius-1.1.8 && make"
+  - cd /tmp/freeradius-1.1.8
+  - ./configure --prefix=/opt/freeradius-1.1.8
+# BRUTE-FORCE hack/workaround to force the use of /usr/bin/libtool;
+# given ./configure --with-system-libtool seems to be ignored by travis-ci/ubuntu?
+  - mv libtool libtool.crap
+  - ln -s /usr/bin/libtool libtool
+  - ls -la libtool
+  - make
