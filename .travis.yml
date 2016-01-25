@@ -10,6 +10,7 @@ branches:
 before_install:
   - sudo apt-get update -qq
   - sudo apt-get install -qq build-essential libtool libperl-dev
+  - `which libtool` --version
 
 before_script:
   - cd /tmp
@@ -25,4 +26,4 @@ before_script:
 #  - ./autogen.sh
 
 script:
-  - "cd /tmp/freeradius-1.1.8 && ./configure --prefix=/opt/freeradius-1.1.8 && make"
+  - "cd /tmp/freeradius-1.1.8 && ./configure --with-system-libtool --prefix=/opt/freeradius-1.1.8 && make"
