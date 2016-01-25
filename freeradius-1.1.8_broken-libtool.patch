@@ -1,0 +1,12 @@
+diff -Naur freeradius-1.1.8/Make.inc.in freeradius-1.1.8_broken-libtool-patch/Make.inc.in
+--- freeradius-1.1.8/Make.inc.in	2009-09-09 22:20:06.000000000 +1000
++++ freeradius-1.1.8_broken-libtool-patch/Make.inc.in	2016-01-25 14:46:48.896895785 +1100
+@@ -26,7 +26,7 @@
+ CC		= @CC@
+ RANLIB		= @RANLIB@
+ INCLUDE		= 
+-CFLAGS		= $(INCLUDE) @CFLAGS@ @LFS_CFLAGS@
++CFLAGS		= $(INCLUDE) @CFLAGS@ @LFS_CFLAGS@ -DIE_LIBTOOL_DIE
+ CPPFLAGS	= @CPPFLAGS@
+ LIBPREFIX	= @LIBPREFIX@
+ EXEEXT		= @EXEEXT@ 
