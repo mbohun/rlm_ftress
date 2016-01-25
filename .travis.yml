@@ -9,17 +9,24 @@ branches:
 
 before_install:
   - sudo apt-get update -qq
-  - sudo apt-get install -qq build-essential libtool libperl-dev
-  - LIBTOOL_INFO="`which libtool` --version => $(`which libtool` --version)"
-  - echo "LIBTOOL_INFO:$LIBTOOL_INFO"
+  - sudo apt-get install -qq libperl-dev
 
 before_script:
+# download & build libtool
+  - cd /tmp
+  - wget http://ftpmirror.gnu.org/libtool/libtool-2.4.6.tar.gz
+  - tar -zxvf libtool-2.4.6.tar.gz
+  - cd libtool-2.4.6
+  - ./configure --prefix=/tmp/libtool-2.4.6_build
+  - make && make install
+  - export PATH=/tmp/libtool-2.4.6_build/bin:$PATH
+
+# download & build FreeRADIUS
   - cd /tmp
   - wget ftp://ftp.freeradius.org/pub/radius/freeradius-1.1.8.tar.bz2
   - tar -jxvf freeradius-1.1.8.tar.bz2
   - cd freeradius-1.1.8
-  - patch -p1 < $TRAVIS_BUILD_DIR/freeradius-1.1.8_broken-libtool.patch
-  - cat Make.inc.in
+
   - cd src/modules
   - ln -s $TRAVIS_BUILD_DIR rlm_ftress
   - echo "rlm_ftress" >> stable
@@ -28,7 +35,5 @@ before_script:
 
 script:
   - cd /tmp/freeradius-1.1.8
-  - ./configure LIBTOOL='/usr/bin/libtool'
-# BRUTE-FORCE hack/workaround to force the use of /usr/bin/libtool;
-# given ./configure --with-system-libtool seems to be ignored by travis-ci/ubuntu?
+  - ./configure --with-system-libtool
   - make
