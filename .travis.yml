@@ -9,7 +9,7 @@ branches:
 
 before_install:
   - sudo apt-get update -qq -y
-  - sudo apt-get install -qq -y autotools-dev libperl-dev
+  - sudo apt-get install -qq -y autotools-dev libtool libperl-dev
 
 before_script:
   - cd /tmp
