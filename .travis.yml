@@ -8,8 +8,8 @@ branches:
     - master
 
 before_install:
-  - sudo apt-get update -qq
-  - sudo apt-get install -qq libperl-dev
+  - sudo apt-get update -qq -y
+  - sudo apt-get install -qq -y autotools-dev libperl-dev
 
 before_script:
   - cd /tmp
