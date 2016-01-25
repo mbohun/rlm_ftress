@@ -22,4 +22,4 @@ before_script:
 #  - ./autogen.sh
 
 script:
-  - "cd /tmp/freeradius-1.1.8 && ./configure --prefix=/opt/freeradius-1.1.8 && make && sudo make install"
+  - "cd /tmp/freeradius-1.1.8 && ./configure --with-system-libtool --prefix=/opt/freeradius-1.1.8 && make"
