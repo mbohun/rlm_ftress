@@ -14,8 +14,8 @@ before_install:
 before_script:
 # download & build libtool
   - cd /tmp
-  - wget http://ftpmirror.gnu.org/libtool/libtool-2.4.6.tar.gz
-  - tar -zxvf libtool-2.4.6.tar.gz
+  - wget http://ftpmirror.gnu.org/libtool/libtool-2.4.6.tar.xz
+  - tar -Jxvf libtool-2.4.6.tar.xz
   - cd libtool-2.4.6
   - ./configure --prefix=/tmp/libtool-2.4.6_build
   - make && make install
