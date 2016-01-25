@@ -10,7 +10,8 @@ branches:
 before_install:
   - sudo apt-get update -qq
   - sudo apt-get install -qq build-essential libtool libperl-dev
-  - `which libtool` --version
+  - LIBTOOL_INFO=$(`which libtool` --version)
+  - echo "LIBTOOL_INFO:$LIBTOOL_INFO"
 
 before_script:
   - cd /tmp
