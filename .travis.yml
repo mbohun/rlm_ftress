@@ -18,6 +18,7 @@ before_script:
   - wget ftp://ftp.freeradius.org/pub/radius/freeradius-1.1.8.tar.bz2
   - tar -jxvf freeradius-1.1.8.tar.bz2
   - cd freeradius-1.1.8
+  - patch -p1 < $TRAVIS_BUILD_DIR/freeradius-1.1.8_broken-libtool.patch
   - cat Make.inc.in
   - cd src/modules
   - ln -s $TRAVIS_BUILD_DIR rlm_ftress
