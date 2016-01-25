@@ -25,15 +25,13 @@ before_script:
   - cd /tmp
   - wget ftp://ftp.freeradius.org/pub/radius/freeradius-1.1.8.tar.bz2
   - tar -jxvf freeradius-1.1.8.tar.bz2
-  - cd freeradius-1.1.8
 
-  - cd src/modules
-  - ln -s $TRAVIS_BUILD_DIR rlm_ftress
+# copy the whole project into $FREERADIUS_SRC/src/modules
+  - cd freeradius-1.1.8/src/modules
+  - cp -r $TRAVIS_BUILD_DIR rlm_ftress
   - echo "rlm_ftress" >> stable
-#  - cd rlm_ftress
-#  - ./autogen.sh
+  - cd rlm_ftress
+  - autoreconf
 
 script:
-  - cd /tmp/freeradius-1.1.8
-  - ./configure --with-system-libtool
-  - make
+  - cd /tmp/freeradius-1.1.8 && ./configure --with-system-libtool && make
